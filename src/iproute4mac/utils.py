@@ -8,12 +8,12 @@ from _ctypes import PyObj_FromPtr
 ''' Costants '''
 # Linux Address families
 AF_UNSPEC = 0
-AF_INET   = 2
+AF_INET = 2
 AF_BRIDGE = 7
-AF_INET6  = 10
-AF_PACKET = 17 # not present in BSD
-AF_INET6  = 26
-AF_MPLS   = 28
+AF_INET6 = 10
+AF_PACKET = 17    # not present in BSD
+AF_INET6 = 26
+AF_MPLS = 28
 
 address_families = [
     (AF_UNSPEC, 'none'),
@@ -35,7 +35,6 @@ oper_states = {
 }
 
 
-''' Utilities '''
 def stderr(text):
     sys.stderr.write(text + '\n')
 
@@ -115,6 +114,7 @@ def json_unindent_list(obj):
 class NoIndent(object):
     def __init__(self, value):
         self.value = value
+
     def __repr__(self):
         if self.value:
             reps = (repr(v) for v in self.value)

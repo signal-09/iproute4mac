@@ -6,7 +6,6 @@ from iproute4mac.utils import *
 option = {}
 
 
-''' Commands '''
 def do_ipaddr_usage():
     stderr("""\
 Usage: ip address {add|change|replace} IFADDR dev IFNAME [ LIFETIME ]
@@ -79,16 +78,16 @@ def do_ipaddr(argv=[], opts={}):
     cmd = argv.pop(0)
     if 'add'.startswith(cmd):
         return do_notimplemented()
-    elif ('change'.startswith(cmd) or
-          'chg'.startswith(cmd)):
+    elif ('change'.startswith(cmd)
+          or 'chg'.startswith(cmd)):
         return do_notimplemented()
     elif 'replace'.startswith(cmd):
         return do_notimplemented()
     elif 'delete'.startswith(cmd):
         return do_notimplemented()
-    elif ('show'.startswith(cmd) or
-          'lst'.startswith(cmd) or
-          'list'.startswith(cmd)):
+    elif ('show'.startswith(cmd)
+          or 'lst'.startswith(cmd)
+          or 'list'.startswith(cmd)):
         return do_ipaddr_list(argv)
     elif 'flush'.startswith(cmd):
         return do_notimplemented()
@@ -101,5 +100,5 @@ def do_ipaddr(argv=[], opts={}):
     elif 'help'.startswith(cmd):
         return do_ipaddr_usage()
 
-    stderr('Command "%s" is unknown, try "ip address help".' % cmd);
+    stderr('Command "%s" is unknown, try "ip address help".' % cmd)
     exit(-1)

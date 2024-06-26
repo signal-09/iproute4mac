@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-import os
 import sys
 
 import iproute4mac
@@ -11,6 +10,7 @@ from iproute4mac.ipaddress import *
 
 def do_help(argv=[], option={}):
     usage()
+
 
 def usage():
     stderr("""\
@@ -124,6 +124,9 @@ def main():
         else:
             stderr('Option "%s" is unknown, try "bridge help".' % opt)
             exit(-1)
+
+    if batch_file:
+        do_notimplemented()
 
     if argv:
         return do_obj(argv, option)

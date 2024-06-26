@@ -1,10 +1,9 @@
 from setuptools import setup, find_packages
-from pathlib import Path
 
-THIS_DIRECTORY = Path(__file__).parent
 VERSION = '0.1.0'
 DESCRIPTION = 'iproute for Mac'
-LONG_DESCRIPTION = (THIS_DIRECTORY / 'README.md').read_text()
+with open('README.md', 'r') as f:
+    LONG_DESCRIPTION = f.read()
 
 setup(
     name = 'iproute4mac',

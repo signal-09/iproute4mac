@@ -3,13 +3,10 @@
 import os
 import sys
 
+import iproute4mac
 from iproute4mac.utils import *
 from iproute4mac.iplink import *
 from iproute4mac.ipaddress import *
-
-
-''' Costants '''
-VERSION = '0.1.0'
 
 
 def do_help(argv=[], option={}):
@@ -166,7 +163,7 @@ def main():
             option['timestamp'] = True
             option['timestamp_short'] = True
         elif '-Version'.startswith(opt):
-            print('ip wrapper, iproute4mac-%s' % VERSION)
+            print('ip wrapper, iproute4mac-%s' % iproute4mac.VERSION)
             exit(0)
         elif '-force'.startswith(opt):
             option['force'] = True

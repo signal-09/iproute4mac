@@ -1,5 +1,3 @@
-import subprocess
-
 import iproute4mac.ifconfig as ifconfig
 from iproute4mac.utils import *
 
@@ -8,7 +6,6 @@ from iproute4mac.utils import *
 option = {}
 
 
-''' Commands '''
 def do_iplink_usage():
     stderr("""\
 Usage: ip link add [link DEV | parentdev NAME] [ name ] NAME
@@ -109,16 +106,16 @@ def do_iplink(argv=[], opts={}):
     cmd = argv.pop(0)
     if 'add'.startswith(cmd):
         return do_notimplemented()
-    elif ('set'.startswith(cmd) or
-          'change'.startswith(cmd)):
+    elif ('set'.startswith(cmd)
+          or 'change'.startswith(cmd)):
         return do_notimplemented()
     elif 'replace'.startswith(cmd):
         return do_notimplemented()
     elif 'delete'.startswith(cmd):
         return do_notimplemented()
-    elif ('show'.startswith(cmd) or
-          'lst'.startswith(cmd) or
-          'list'.startswith(cmd)):
+    elif ('show'.startswith(cmd)
+          or 'lst'.startswith(cmd)
+          or 'list'.startswith(cmd)):
         return do_iplink_list(argv)
     elif 'xstats'.startswith(cmd):
         return do_notimplemented()

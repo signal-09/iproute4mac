@@ -13,37 +13,29 @@ def json_dumps(data, pretty=False):
 
 def text_dumps(data):
     lines = []
-    for l in data:
-        dev = l['ifname'] + '@' + l['link'] if 'link' in l else l['ifname']
-        desc = 'mtu {}'.format(l['mtu'])
-        if 'master' in l:
-            desc = '{} master {}'.format(desc, l['master'])
-        desc = '{} state {}'.format(desc, l['operstate'])
+    for line in data:
+        dev = line['ifname'] + '@' + line['link'] if 'link' in line else line['ifname']
+        desc = 'mtu {}'.format(line['mtu'])
+        if 'master' in line:
+            desc = '{} master {}'.format(desc, line['master'])
+        desc = '{} state {}'.format(desc, line['operstate'])
         lines.append('%d: %s: <%s> %s' % (
-            l['ifindex'], dev, ','.join(l['flags']), desc
+            line['ifindex'], dev, ','.join(line['flags']), desc
         ))
-        lines.append(
-            '    link/' + l['link_type'] +
-            ((' ' + l['address']) if 'address' in l else '') +
-            ((' brd ' + l['broadcast']) if 'broadcast' in l else '')
-        )
-        if 'linkinfo' in l and 'info_kind' in l['linkinfo']:
-            i = l['linkinfo']
+        lines.append('    link/' + line['link_type']
+                     + ((' ' + line['address']) if 'address' in line else '')
+                     + ((' brd ' + line['broadcast']) if 'broadcast' in line else ''))
+        if 'linkinfo' in line and 'info_kind' in line['linkinfo']:
+            i = line['linkinfo']
             if i['info_kind'] == 'vlan':
-                lines.append(
-                    '    %s protocol %s id %d' %
-                    (i['info_kind'], i['info_data']['protocol'], i['info_data']['id'])
-                )
+                lines.append('    %s protocol %s id %d' %
+                             (i['info_kind'], i['info_data']['protocol'], i['info_data']['id']))
             elif i['info_kind'] == 'bridge':
-                lines.append(
-                    '    bridge ' + ' '.join(['%s %s' % (k, v) for k, v in i['info_data'].items()])
-                )
-        for a in l.get('addr_info', []):
+                lines.append('    bridge ' + ' '.join(['%s %s' % (k, v) for k, v in i['info_data'].items()]))
+        for a in line.get('addr_info', []):
             address = '%s peer %s' % (a['local'], a['address']) if 'address' in a else a['local']
-            lines.append(
-                '    %s %s/%d' % (a['family'], address, a['prefixlen']) +
-                ((' brd ' + a['broadcast']) if 'broadcast' in a else '')
-            )
+            lines.append('    %s %s/%d' % (a['family'], address, a['prefixlen'])
+                         + ((' brd ' + a['broadcast']) if 'broadcast' in a else ''))
     return '\n'.join(lines)
 
 
@@ -52,6 +44,7 @@ def dumps(data, option):
         print(json_dumps(data, option['pretty']))
     elif data:
         print(text_dumps(data))
+
 
 def parse(res, option={}):
     links = []
@@ -89,7 +82,7 @@ def parse(res, option={}):
                 link['broadcast'] = 'ff:ff:ff:ff:ff:ff'
             elif re.match(r'^\s+inet ', r) and option['preferred_family'] != AF_INET6:
                 (local, netmask) = re.findall(r'inet (\d+\.\d+\.\d+\.\d+).* netmask (0x[0-9a-f]+)', r)[0]
-                addr = { 'family': 'inet', 'local': local }
+                addr = {'family': 'inet', 'local': local}
                 if re.match(r'^.*-->', r):
                     addr['address'] = re.findall(r'--> (\d+\.\d+\.\d+\.\d+)', r)[0]
                 addr['prefixlen'] = netmask_to_length(netmask)
@@ -124,40 +117,34 @@ def parse(res, option={}):
             elif re.match(r'^\s+id .* priority .* hellotime .* fwddelay .*', r):
                 (bridge_id, bridge_priority, hello_time, forward_delay) = re.findall(
                     r'id (\w+:\w+:\w+:\w+:\w+:\w+) priority (\d+) hellotime (\d+) fwddelay (\d+)', r)[0]
-                link['linkinfo']['info_data'].update(
-                    {
-                        'forward_delay': forward_delay,
-                        'hello_time': hello_time
-                    }
-                )
+                link['linkinfo']['info_data'].update({
+                    'forward_delay': forward_delay,
+                    'hello_time': hello_time
+                })
                 r = next(lines)
 
                 try:
                     (max_age, hold_count, bridge_protocol, max_addr, ageing_time) = re.findall(
                         r'maxage (\d+) holdcnt (\d+) proto (\w+) maxaddr (\d+) timeout (\d+)', r)[0]
-                    link['linkinfo']['info_data'].update(
-                        {
-                            'max_age': max_age,
-                            'ageing_time': ageing_time
-                        }
-                    )
+                    link['linkinfo']['info_data'].update({
+                        'max_age': max_age,
+                        'ageing_time': ageing_time
+                    })
                     r = next(lines)
-                except:
+                except Exception:
                     pass
 
                 try:
                     (root_id, priority, root_path_cost, root_port) = re.findall(
                         r'root id (\w+:\w+:\w+:\w+:\w+:\w+) priority (\d+) ifcost (\d+) port (\d+)', r)[0]
-                    link['linkinfo']['info_data'].update(
-                        {
-                            'priority': priority,
-                            'root_id': root_id,
-                            'root_port': root_port,
-                            'root_path_cost': root_path_cost
-                        }
-                    )
+                    link['linkinfo']['info_data'].update({
+                        'priority': priority,
+                        'root_id': root_id,
+                        'root_port': root_port,
+                        'root_path_cost': root_path_cost
+                    })
                     r = next(lines)
-                except:
+                except Exception:
                     pass
 
                 (ipfilter, flags) = re.findall(
@@ -169,7 +156,7 @@ def parse(res, option={}):
                 index = next((i for (i, l) in enumerate(links) if l['ifname'] == dev), None)
                 links[index]['master'] = ifname
                 if 'linkinfo' not in links[index]:
-                    links[index]['linkinfo'] = { 'info_slave_kind': 'bridge' }
+                    links[index]['linkinfo'] = {'info_slave_kind': 'bridge'}
                 else:
                     links[index]['linkinfo']['info_slave_kind'] = 'bridge'
 
@@ -195,30 +182,30 @@ def list(argv, option):
     while argv:
         opt = argv.pop(0)
         if opt == 'up':
-            links = [l for l in links if ('flags' in l and 'UP' in l['flags'])]
+            links = [link for link in links if ('flags' in link and 'UP' in link['flags'])]
         elif opt == 'group':
             try:
                 group = argv.pop(0)
             except IndexError:
                 missarg('group name')
             do_notimplemented()
-            invarg('Invalid "group" value', group);
+            invarg('Invalid "group" value', group)
         elif opt == 'master':
             try:
                 master = argv.pop(0)
             except IndexError:
                 missarg('master device')
-            if not any(l['ifname'] == master for l in links):
-                invarg('Device does not exist', master);
-            links = [l for l in links if ('master' in l and l['master'] == master)]
+            if not any(link['ifname'] == master for link in links):
+                invarg('Device does not exist', master)
+            links = [link for link in links if ('master' in link and link['master'] == master)]
         elif opt == 'master':
             try:
                 master = argv.pop(0)
             except IndexError:
                 missarg('vrf device')
-            if not any(l['ifname'] == master for l in links):
-                invarg('Not a valid VRF name', master);
-            links = [l for l in links if ('master' in l and l['master'] == master)]
+            if not any(link['ifname'] == master for link in links):
+                invarg('Not a valid VRF name', master)
+            links = [link for link in links if ('master' in link and link['master'] == master)]
             # FIXME: https://wiki.netunix.net/freebsd/network/vrf/
             do_notimplemented()
         elif opt == 'type':
@@ -228,9 +215,9 @@ def list(argv, option):
                 missarg('link type')
             if kind.endswith('_slave'):
                 kind = kind.replace('_slave', '')
-                links = [l for l in links if recurse_in(l, ['linkinfo', 'info_slave_kind'], kind)]
+                links = [link for link in links if recurse_in(link, ['linkinfo', 'info_slave_kind'], kind)]
             else:
-                links = [l for l in links if recurse_in(l, ['linkinfo', 'info_kind'], kind)]
+                links = [link for link in links if recurse_in(link, ['linkinfo', 'info_kind'], kind)]
         elif 'help'.startswith(opt):
             do_iplink_usage()
         else:
@@ -239,7 +226,7 @@ def list(argv, option):
                     dev = argv.pop(0)
                 except IndexError:
                     error('Command line is not complete. Try option "help"')
-                links = [l for l in links if l['ifname'] == dev]
+                links = [link for link in links if link['ifname'] == dev]
                 if not links:
                     stderr('Device "%s" does not exist.' % dev)
                     exit(-1)

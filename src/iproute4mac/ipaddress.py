@@ -63,7 +63,7 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
 #           vcan | veth | vlan | vrf | vti | vxcan | vxlan | wwan |
 #           xfrm }
 def do_ipaddr_list(argv=[]):
-    links = ifconfig.list(argv, option)
+    links = ifconfig.links(argv, option)
     ifconfig.dumps(links, option)
     return EXIT_SUCCESS
 

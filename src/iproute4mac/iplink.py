@@ -90,7 +90,7 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
 #         | netdevsim | rmnet | xfrm ]
 # ETYPE := [ TYPE | bridge_slave | bond_slave ]
 def do_iplink_list(argv=[]):
-    links = ifconfig.list(argv, option)
+    links = ifconfig.links(argv, option)
     delete_keys(links, ['addr_info'])
     ifconfig.dumps(links, option)
     return EXIT_SUCCESS

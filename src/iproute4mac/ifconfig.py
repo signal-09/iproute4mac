@@ -46,129 +46,180 @@ def dumps(data, option):
         print(text_dumps(data))
 
 
+class ifconfigRegEx:
+    _header = re.compile(r'^(?P<ifname>\w+):'
+                         r' flags=\w+<(?P<flags>.*)>'
+                         r' mtu (?P<mtu>\d+)'
+                         r' index (?P<ifindex>\d+)')
+    _eflags = re.compile(r'^\s+eflags=\w+<(?P<eflags>.*)>')
+    _ether = re.compile(r'^\s+ether ((?:[0-9a-fA-F]{2}:?){6})')
+    _inet = re.compile(r'^\s+inet (?P<local>\d+\.\d+\.\d+\.\d+)'
+                       r'(?: --> (?P<address>\d+\.\d+\.\d+\.\d+))?'
+                       r' netmask (?P<netmask>0x[0-9a-f]{8})'
+                       r'(?: broadcast (?P<broadcast>\d+\.\d+\.\d+\.\d+))?')
+    _inet6 = re.compile(r'^\s+inet6 (?P<local>[0-9a-f:]*::[0-9a-f:]+)(?:%\w+)?'
+                        r' prefixlen (?P<prefixlen>\d+)'
+                        r'(?: (?P<secured>secured))?'
+                        r'(?: scopeid (?P<scopeid>0x[0-9a-f]+))?')
+    _state = re.compile(r'^\s+status: (?P<state>\w+)')
+    _vlan = re.compile(r'^\s+vlan: (?P<vlanid>\d+) parent interface: (?P<parent><?\w+>?)')
+    _bond = re.compile(r'^\s+bond interfaces: (\w+(?: \w+)*)')
+    _bridge = re.compile(r'^\s+Configuration:')
+
+    def __init__(self, line):
+        self.header = self._header.match(line)
+        self.eflags = self._eflags.match(line)
+        self.ether = self._ether.match(line)
+        self.inet = self._inet.match(line)
+        self.inet6 = self._inet6.match(line)
+        self.state = self._state.match(line)
+        self.vlan = self._vlan.match(line)
+        self.bond = self._bond.match(line)
+        self.bridge = self._bridge.match(line)
+
+
+class bridgeRegEx:
+    _id = re.compile(r'^\s+id (?P<id>(?:[0-9a-fA-F]{1,2}:?){6})'
+                     r' priority (?P<priority>\d+)'
+                     r' hellotime (?P<hello>\d+)'
+                     r' fwddelay (?P<delay>\d+)')
+    _age = re.compile(r'^\s+maxage (?P<max_age>\d+)'
+                      r' holdcnt (?P<hold>\d+)'
+                      r' proto (?P<protocol>\w+)'
+                      r' maxaddr (?P<addr>\d+)'
+                      r' timeout (?P<ageing>\d+)')
+    _root = re.compile(r'^\s+root id (?P<id>(?:[0-9a-fA-F]{1,2}:?){6})'
+                       r' priority (?P<priority>\d+)'
+                       r' ifcost (?P<cost>\d+)'
+                       r' port (?P<port>\d+)')
+    _filter = re.compile(r'^\s+ipfilter (?P<filter>\w+)'
+                         r' flags (?P<flags>0x[0-9a-fA-F]+)')
+    _member = re.compile(r'^\s+member: (?P<member>\w+)')
+    _cache = re.compile(r'^\s+media:')
+
+    def __init__(self, line):
+        self.id = self._id.match(line)
+        self.age = self._age.match(line)
+        self.root = self._root.match(line)
+        self.filter = self._filter.match(line)
+        self.member = self._member.match(line)
+        self.cache = self._cache.match(line)
+
+
+def parse_bridge(lines, links, link):
+    info_data = {}
+    while line := next(lines):
+        match = bridgeRegEx(line)
+
+        if match.id:
+            info_data['forward_delay'] = int(match.id.group('delay'))
+            info_data['hello_time'] = int(match.id.group('hello'))
+        elif match.age:
+            info_data['max_age'] = int(match.age.group('max_age'))
+            info_data['ageing_time'] = int(match.age.group('ageing'))
+        elif match.root:
+            info_data['priority'] = int(match.root.group('priority'))
+            info_data['root_id'] = match.root.group('id')
+            info_data['root_port'] = int(match.root.group('port'))
+            info_data['root_path_cost'] = int(match.root.group('cost'))
+        elif match.filter:
+            info_data['ipfilter'] = match.filter.group('filter') != 'disabled'
+        elif match.member:
+            slave = next(item for item in links if item['ifname'] == match.member.group('member'))
+            slave['master'] = link['ifname']
+            slave['linkinfo'] = {'info_slave_kind': 'bridge'}
+        elif match.cache:
+            link['linkinfo'].update({'info_data': info_data})
+            break
+
+
 def parse(res, option={}):
     links = []
-    count = 1
-
     lines = iter(res.split('\n'))
-    while r := next(lines):
-        if re.match(r'^\w+:', r):
-            if count > 1:
-                if 'addr_info' not in link:
-                    link['addr_info'] = []
-                links.append(link)
-            (ifname, flags, mtu, ifindex) = re.findall(r'^(\w+): flags=\d+<(.*)> mtu (\d+) index (\d+)', r)[0]
-            flags = flags.split(',') if flags != '' else []
+    while line := next(lines):
+        match = ifconfigRegEx(line)
+
+        if match.header:
+            header = match.header.groupdict()
             link = {
-                'ifindex': int(ifindex),
-                'ifname': ifname,
-                'flags': flags,
-                'mtu': int(mtu),
+                'ifindex': int(header['ifindex']),
+                'ifname': header['ifname'],
+                'flags': header['flags'].split(',') if header['flags'] != '' else [],
+                'mtu': int(header['mtu']),
                 'operstate': 'UNKNOWN',
-                'link_type': 'unknown'
+                'link_type': 'none'
             }
-            if 'LOOPBACK' in flags:
+
+            if 'LOOPBACK' in link['flags']:
                 link['link_type'] = 'loopback'
                 link['address'] = '00:00:00:00:00:00'
                 link['broadcast'] = '00:00:00:00:00:00'
-            elif 'POINTOPOINT' in flags:
-                link['link_type'] = 'none'
+            elif 'POINTOPOINT' in link['flags']:
                 link['link_pointtopoint'] = True
-            count = count + 1
-        else:
-            if re.match(r'^\s+ether ', r):
-                link['link_type'] = 'ether'
-                link['address'] = re.findall(r'(\w\w:\w\w:\w\w:\w\w:\w\w:\w\w)', r)[0]
-                link['broadcast'] = 'ff:ff:ff:ff:ff:ff'
-            elif re.match(r'^\s+inet ', r) and option['preferred_family'] != AF_INET6:
-                (local, netmask) = re.findall(r'inet (\d+\.\d+\.\d+\.\d+).* netmask (0x[0-9a-f]+)', r)[0]
-                addr = {'family': 'inet', 'local': local}
-                if re.match(r'^.*-->', r):
-                    addr['address'] = re.findall(r'--> (\d+\.\d+\.\d+\.\d+)', r)[0]
-                addr['prefixlen'] = netmask_to_length(netmask)
-                if re.match(r'^.*broadcast', r):
-                    addr['broadcast'] = re.findall(r'broadcast (\d+\.\d+\.\d+\.\d+)', r)[0]
-                link['addr_info'] = link.get('addr_info', []) + [addr]
-            elif re.match(r'^\s+inet6 ', r) and option['preferred_family'] != AF_INET:
-                (local, prefixlen) = re.findall(r'inet6 ([0-9a-f:]*::[0-9a-f:]+)%*\w* prefixlen (\d+)', r)[0]
-                link['addr_info'] = link.get('addr_info', []) + [{
-                    'family': 'inet6',
-                    'local': local,
-                    'prefixlen': int(prefixlen)
-                }]
-            elif re.match(r'^\s+status: ', r):
-                link['operstate'] = oper_states[re.findall(r'status: (\w+)', r)[0]]
-            elif re.match(r'^\s+vlan: ', r):
-                (vid, vlink) = re.findall(r'vlan: (\d+) parent interface: (<?\w+>?)', r)[0]
-                link['link'] = vlink
-                link['linkinfo'] = {
-                    'info_kind': 'vlan',
-                    'info_data': {
-                        'protocol': '802.1Q',
-                        'id': int(vid),
-                        'flags': []
-                    }
+
+            if (link['ifname'].startswith('bridge')
+                or link['ifname'].startswith('bond')
+                or link['ifname'].startswith('vlan')):
+                link['linkinfo'] = {'info_kind': re.sub(r'[0-9]+', '', link['ifname'])}
+
+            links.append(link)
+            continue
+
+        if match.eflags:
+            link['eflags'] = match.eflags.group('eflags').split(',')
+        elif match.ether:
+            link['link_type'] = 'ether'
+            link['address'] = match.ether.group(1)
+            link['broadcast'] = 'ff:ff:ff:ff:ff:ff'
+        elif match.state:
+            link['operstate'] = oper_states[match.state.group('state')]
+        elif match.inet:
+            a = match.inet.groupdict()
+            addr = {
+                'family': 'inet',
+                'local': a['local']
+            }
+            if a['address']:
+                addr['address'] = a['address']
+            addr['prefixlen'] = netmask_to_length(a['netmask'])
+            if a['broadcast']:
+                addr['broadcast'] = a['broadcast']
+            link['addr_info'] = link.get('addr_info', []) + [addr]
+        elif match.inet6:
+            a = match.inet6.groupdict()
+            addr = {
+                'family': 'inet6',
+                'local': a['local'],
+                'prefixlen': int(a['prefixlen'])
+            }
+            link['addr_info'] = link.get('addr_info', []) + [addr]
+        elif match.vlan:
+            parent = match.vlan.group('parent')
+            if parent != '<none>':
+                link['link'] = parent
+            link['linkinfo'].update({
+                'info_data': {
+                    'protocol': '802.1Q',
+                    'id': int(match.vlan.group('vlanid')),
+                    'flags': []
                 }
-            elif re.match(r'^\s+Configuration:', r):
-                link['linkinfo'] = {
-                    'info_kind': 'bridge',
-                    'info_data': {}
+            })
+        elif match.bond:
+            for ifname in match.bond.group(1).split(' '):
+                slave = next(item for item in links if item['ifname'] == ifname)
+                slave['master'] = link['ifname']
+                slave['address'] = link['address']
+                slave['linkinfo'] = {
+                    'info_slave_kind': 'bond',
+                    'perm_hwaddr': slave['address']
                 }
-            elif re.match(r'^\s+id .* priority .* hellotime .* fwddelay .*', r):
-                (bridge_id, bridge_priority, hello_time, forward_delay) = re.findall(
-                    r'id (\w+:\w+:\w+:\w+:\w+:\w+) priority (\d+) hellotime (\d+) fwddelay (\d+)', r)[0]
-                link['linkinfo']['info_data'].update({
-                    'forward_delay': forward_delay,
-                    'hello_time': hello_time
-                })
-                r = next(lines)
-
-                try:
-                    (max_age, hold_count, bridge_protocol, max_addr, ageing_time) = re.findall(
-                        r'maxage (\d+) holdcnt (\d+) proto (\w+) maxaddr (\d+) timeout (\d+)', r)[0]
-                    link['linkinfo']['info_data'].update({
-                        'max_age': max_age,
-                        'ageing_time': ageing_time
-                    })
-                    r = next(lines)
-                except Exception:
-                    pass
-
-                try:
-                    (root_id, priority, root_path_cost, root_port) = re.findall(
-                        r'root id (\w+:\w+:\w+:\w+:\w+:\w+) priority (\d+) ifcost (\d+) port (\d+)', r)[0]
-                    link['linkinfo']['info_data'].update({
-                        'priority': priority,
-                        'root_id': root_id,
-                        'root_port': root_port,
-                        'root_path_cost': root_path_cost
-                    })
-                    r = next(lines)
-                except Exception:
-                    pass
-
-                (ipfilter, flags) = re.findall(
-                    r'ipfilter (\w+) flags (0x[0-9a-fA-F]+)', r)[0]
-                link['linkinfo']['info_data']['ipfilter'] = ipfilter != 'disabled'
-
-            elif re.match(r'^\s+member: ', r):
-                dev = re.findall(r'member: (\w+)', r)[0]
-                index = next((i for (i, l) in enumerate(links) if l['ifname'] == dev), None)
-                links[index]['master'] = ifname
-                if 'linkinfo' not in links[index]:
-                    links[index]['linkinfo'] = {'info_slave_kind': 'bridge'}
-                else:
-                    links[index]['linkinfo']['info_slave_kind'] = 'bridge'
-
-    if count > 1:
-        if 'addr_info' not in link:
-            link['addr_info'] = []
-        links.append(link)
+        elif match.bridge:
+            parse_bridge(lines, links, link)
 
     return links
 
 
-def list(argv, option):
+def links(argv, option):
     cmd = subprocess.run(['ifconfig', '-v', '-a'],
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,
@@ -223,13 +274,13 @@ def list(argv, option):
         else:
             if opt == 'dev':
                 try:
-                    dev = argv.pop(0)
+                    opt = argv.pop(0)
                 except IndexError:
                     error('Command line is not complete. Try option "help"')
-                links = [link for link in links if link['ifname'] == dev]
-                if not links:
-                    stderr('Device "%s" does not exist.' % dev)
-                    exit(-1)
+            links = [link for link in links if link['ifname'] == opt]
+            if not links:
+                stderr('Device "%s" does not exist.' % opt)
+                exit(-1)
 
     if not option['show_details']:
         delete_keys(links, ['linkinfo'])

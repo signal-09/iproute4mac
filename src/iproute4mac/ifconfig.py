@@ -1,70 +1,71 @@
 import re
-import subprocess
 
 from iproute4mac.utils import *
 
 
-def json_dumps(data, pretty=False):
-    if pretty:
-        return json.dumps(data, cls=IpRouteJSON, indent=4)
-    else:
-        return json.dumps(data, separators=(',', ':'))
-
-
-def text_dumps(data):
-    lines = []
-    for line in data:
-        dev = line['ifname'] + '@' + line['link'] if 'link' in line else line['ifname']
-        desc = 'mtu {}'.format(line['mtu'])
-        if 'master' in line:
-            desc = '{} master {}'.format(desc, line['master'])
-        desc = '{} state {}'.format(desc, line['operstate'])
-        lines.append('%d: %s: <%s> %s' % (
-            line['ifindex'], dev, ','.join(line['flags']), desc
-        ))
-        lines.append('    link/' + line['link_type']
-                     + ((' ' + line['address']) if 'address' in line else '')
-                     + ((' brd ' + line['broadcast']) if 'broadcast' in line else ''))
-        if 'linkinfo' in line and 'info_kind' in line['linkinfo']:
-            i = line['linkinfo']
-            if i['info_kind'] == 'vlan':
-                lines.append('    %s protocol %s id %d' %
-                             (i['info_kind'], i['info_data']['protocol'], i['info_data']['id']))
-            elif i['info_kind'] == 'bridge':
-                lines.append('    bridge ' + ' '.join(['%s %s' % (k, v) for k, v in i['info_data'].items()]))
-        for a in line.get('addr_info', []):
-            address = '%s peer %s' % (a['local'], a['address']) if 'address' in a else a['local']
-            lines.append('    %s %s/%d' % (a['family'], address, a['prefixlen'])
-                         + ((' brd ' + a['broadcast']) if 'broadcast' in a else ''))
-    return '\n'.join(lines)
-
-
-def dumps(data, option):
+def dumps(links, option):
     if option['json']:
-        print(json_dumps(data, option['pretty']))
-    elif data:
-        print(text_dumps(data))
+        print(json_dumps(links, option['pretty']))
+        return
+
+    if not links:
+        return
+
+    for link in links:
+        stdout(link['ifindex'], ': ', link['ifname'])
+        if 'link' in link:
+            stdout('@', link['link'])
+        stdout(': <', ','.join(link['flags']), '> mtu ', link['mtu'])
+        if 'master' in link:
+            stdout(' master ', link['master'])
+        stdout(' state ', link['operstate'], end='\n')
+
+        stdout('    link/', link['link_type'])
+        if 'address' in link:
+            stdout(' ', link['address'])
+        if 'broadcast' in link:
+            stdout(' brd ', link['broadcast'])
+        stdout(end='\n')
+
+        if 'linkinfo' in link and 'info_kind' in link['linkinfo']:
+            info = link['linkinfo']
+            if info['info_kind'] == 'vlan':
+                data = info['info_data']
+                stdout('    ', info['info_kind'], ' protocol ', data['protocol'], ' id ', data['id'], end='\n')
+            elif info['info_kind'] == 'bridge':
+                data = info['info_data']
+                stdout('    bridge', ['%s %s' % (k, v) for k, v in data.items()], sep=' ', end='\n')
+
+        for addr in link.get('addr_info', []):
+            stdout('    ', addr['family'])
+            stdout(' ', addr['local'])
+            if 'address' in addr:
+                stdout(' peer ', addr['address'])
+            stdout('/', addr['prefixlen'])
+            if 'broadcast' in addr:
+                stdout(' brd ', addr['broadcast'])
+            stdout(end='\n')
 
 
 class ifconfigRegEx:
-    _header = re.compile(r'^(?P<ifname>\w+):'
+    _header = re.compile(r'(?P<ifname>\w+):'
                          r' flags=\w+<(?P<flags>.*)>'
                          r' mtu (?P<mtu>\d+)'
                          r' index (?P<ifindex>\d+)')
-    _eflags = re.compile(r'^\s+eflags=\w+<(?P<eflags>.*)>')
-    _ether = re.compile(r'^\s+ether ((?:[0-9a-fA-F]{2}:?){6})')
-    _inet = re.compile(r'^\s+inet (?P<local>\d+\.\d+\.\d+\.\d+)'
+    _eflags = re.compile(r'\s+eflags=\w+<(?P<eflags>.*)>')
+    _ether = re.compile(r'\s+ether ((?:[0-9a-fA-F]{2}:?){6})')
+    _inet = re.compile(r'\s+inet (?P<local>\d+\.\d+\.\d+\.\d+)'
                        r'(?: --> (?P<address>\d+\.\d+\.\d+\.\d+))?'
                        r' netmask (?P<netmask>0x[0-9a-f]{8})'
                        r'(?: broadcast (?P<broadcast>\d+\.\d+\.\d+\.\d+))?')
-    _inet6 = re.compile(r'^\s+inet6 (?P<local>[0-9a-f:]*::[0-9a-f:]+)(?:%\w+)?'
+    _inet6 = re.compile(r'\s+inet6 (?P<local>[0-9a-f:]*::[0-9a-f:]+)(?:%\w+)?'
                         r' prefixlen (?P<prefixlen>\d+)'
                         r'(?: (?P<secured>secured))?'
                         r'(?: scopeid (?P<scopeid>0x[0-9a-f]+))?')
-    _state = re.compile(r'^\s+status: (?P<state>\w+)')
-    _vlan = re.compile(r'^\s+vlan: (?P<vlanid>\d+) parent interface: (?P<parent><?\w+>?)')
-    _bond = re.compile(r'^\s+bond interfaces: (\w+(?: \w+)*)')
-    _bridge = re.compile(r'^\s+Configuration:')
+    _state = re.compile(r'\s+status: (?P<state>\w+)')
+    _vlan = re.compile(r'\s+vlan: (?P<vlanid>\d+) parent interface: (?P<parent><?\w+>?)')
+    _bond = re.compile(r'\s+bond interfaces: (\w+(?: \w+)*)')
+    _bridge = re.compile(r'\s+Configuration:')
 
     def __init__(self, line):
         self.header = self._header.match(line)
@@ -79,23 +80,23 @@ class ifconfigRegEx:
 
 
 class bridgeRegEx:
-    _id = re.compile(r'^\s+id (?P<id>(?:[0-9a-fA-F]{1,2}:?){6})'
+    _id = re.compile(r'\s+id (?P<id>(?:[0-9a-fA-F]{1,2}:?){6})'
                      r' priority (?P<priority>\d+)'
                      r' hellotime (?P<hello>\d+)'
                      r' fwddelay (?P<delay>\d+)')
-    _age = re.compile(r'^\s+maxage (?P<max_age>\d+)'
+    _age = re.compile(r'\s+maxage (?P<max_age>\d+)'
                       r' holdcnt (?P<hold>\d+)'
                       r' proto (?P<protocol>\w+)'
                       r' maxaddr (?P<addr>\d+)'
                       r' timeout (?P<ageing>\d+)')
-    _root = re.compile(r'^\s+root id (?P<id>(?:[0-9a-fA-F]{1,2}:?){6})'
+    _root = re.compile(r'\s+root id (?P<id>(?:[0-9a-fA-F]{1,2}:?){6})'
                        r' priority (?P<priority>\d+)'
                        r' ifcost (?P<cost>\d+)'
                        r' port (?P<port>\d+)')
-    _filter = re.compile(r'^\s+ipfilter (?P<filter>\w+)'
+    _filter = re.compile(r'\s+ipfilter (?P<filter>\w+)'
                          r' flags (?P<flags>0x[0-9a-fA-F]+)')
-    _member = re.compile(r'^\s+member: (?P<member>\w+)')
-    _cache = re.compile(r'^\s+media:')
+    _member = re.compile(r'\s+member: (?P<member>\w+)')
+    _cache = re.compile(r'\s+media:')
 
     def __init__(self, line):
         self.id = self._id.match(line)
@@ -133,7 +134,7 @@ def parse_bridge(lines, links, link):
             break
 
 
-def parse(res, option={}):
+def parse(res, option):
     links = []
     lines = iter(res.split('\n'))
     while line := next(lines):
@@ -158,8 +159,8 @@ def parse(res, option={}):
                 link['link_pointtopoint'] = True
 
             if (link['ifname'].startswith('bridge')
-                or link['ifname'].startswith('bond')
-                or link['ifname'].startswith('vlan')):
+                    or link['ifname'].startswith('bond')
+                    or link['ifname'].startswith('vlan')):
                 link['linkinfo'] = {'info_kind': re.sub(r'[0-9]+', '', link['ifname'])}
 
             links.append(link)
@@ -173,7 +174,7 @@ def parse(res, option={}):
             link['broadcast'] = 'ff:ff:ff:ff:ff:ff'
         elif match.state:
             link['operstate'] = oper_states[match.state.group('state')]
-        elif match.inet:
+        elif match.inet and option['preferred_family'] in (AF_INET, AF_UNSPEC):
             a = match.inet.groupdict()
             addr = {
                 'family': 'inet',
@@ -185,7 +186,7 @@ def parse(res, option={}):
             if a['broadcast']:
                 addr['broadcast'] = a['broadcast']
             link['addr_info'] = link.get('addr_info', []) + [addr]
-        elif match.inet6:
+        elif match.inet6 and option['preferred_family'] in (AF_INET6, AF_UNSPEC):
             a = match.inet6.groupdict()
             addr = {
                 'family': 'inet6',
@@ -215,74 +216,5 @@ def parse(res, option={}):
                 }
         elif match.bridge:
             parse_bridge(lines, links, link)
-
-    return links
-
-
-def links(argv, option):
-    cmd = subprocess.run(['ifconfig', '-v', '-a'],
-                         stdout=subprocess.PIPE,
-                         stderr=subprocess.PIPE,
-                         encoding="utf-8")
-    if cmd.returncode != 0:
-        print(cmd.stderr)
-        exit(cmd.returncode)
-
-    option['preferred_family'] = AF_PACKET
-    links = parse(cmd.stdout, option=option)
-    while argv:
-        opt = argv.pop(0)
-        if opt == 'up':
-            links = [link for link in links if ('flags' in link and 'UP' in link['flags'])]
-        elif opt == 'group':
-            try:
-                group = argv.pop(0)
-            except IndexError:
-                missarg('group name')
-            do_notimplemented()
-            invarg('Invalid "group" value', group)
-        elif opt == 'master':
-            try:
-                master = argv.pop(0)
-            except IndexError:
-                missarg('master device')
-            if not any(link['ifname'] == master for link in links):
-                invarg('Device does not exist', master)
-            links = [link for link in links if ('master' in link and link['master'] == master)]
-        elif opt == 'master':
-            try:
-                master = argv.pop(0)
-            except IndexError:
-                missarg('vrf device')
-            if not any(link['ifname'] == master for link in links):
-                invarg('Not a valid VRF name', master)
-            links = [link for link in links if ('master' in link and link['master'] == master)]
-            # FIXME: https://wiki.netunix.net/freebsd/network/vrf/
-            do_notimplemented()
-        elif opt == 'type':
-            try:
-                kind = argv.pop(0)
-            except IndexError:
-                missarg('link type')
-            if kind.endswith('_slave'):
-                kind = kind.replace('_slave', '')
-                links = [link for link in links if recurse_in(link, ['linkinfo', 'info_slave_kind'], kind)]
-            else:
-                links = [link for link in links if recurse_in(link, ['linkinfo', 'info_kind'], kind)]
-        elif 'help'.startswith(opt):
-            do_iplink_usage()
-        else:
-            if opt == 'dev':
-                try:
-                    opt = argv.pop(0)
-                except IndexError:
-                    error('Command line is not complete. Try option "help"')
-            links = [link for link in links if link['ifname'] == opt]
-            if not links:
-                stderr('Device "%s" does not exist.' % opt)
-                exit(-1)
-
-    if not option['show_details']:
-        delete_keys(links, ['linkinfo'])
 
     return links

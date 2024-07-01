@@ -106,8 +106,8 @@ def do_iplink(argv=[], opts={}):
     cmd = argv.pop(0)
     if 'add'.startswith(cmd):
         return do_notimplemented()
-    elif ('set'.startswith(cmd)
-          or 'change'.startswith(cmd)):
+    elif ('change'.startswith(cmd)
+          or 'set'.startswith(cmd)):
         return do_notimplemented()
     elif 'replace'.startswith(cmd):
         return do_notimplemented()

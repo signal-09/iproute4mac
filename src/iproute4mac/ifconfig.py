@@ -4,14 +4,14 @@ import subprocess
 from iproute4mac.utils import *
 
 
-def json_dumps(data, pretty=False):
-    if pretty:
-        return json.dumps(data, cls=IpRouteJSON, indent=4)
-    else:
-        return json.dumps(data, separators=(',', ':'))
+def dumps(data, option):
+    if option['json']:
+        print(json_dumps(data, option['pretty']))
+        return
 
+    if not data:
+        return
 
-def text_dumps(data):
     lines = []
     for line in data:
         dev = line['ifname'] + '@' + line['link'] if 'link' in line else line['ifname']
@@ -36,14 +36,8 @@ def text_dumps(data):
             address = '%s peer %s' % (a['local'], a['address']) if 'address' in a else a['local']
             lines.append('    %s %s/%d' % (a['family'], address, a['prefixlen'])
                          + ((' brd ' + a['broadcast']) if 'broadcast' in a else ''))
-    return '\n'.join(lines)
 
-
-def dumps(data, option):
-    if option['json']:
-        print(json_dumps(data, option['pretty']))
-    elif data:
-        print(text_dumps(data))
+    print('\n'.join(lines))
 
 
 class ifconfigRegEx:

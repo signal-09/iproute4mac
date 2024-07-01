@@ -6,8 +6,9 @@ from _ctypes import PyObj_FromPtr
 
 
 ''' Costants '''
-# Linux Address families
+# socket.h
 AF_UNSPEC = 0
+AF_UNIX = 1
 AF_INET = 2
 AF_BRIDGE = 7
 AF_INET6 = 10
@@ -28,11 +29,35 @@ address_families = [
 EXIT_FAILURE = 1
 EXIT_SUCCESS = 0
 
-# maps operstates
+# map operstates
 oper_states = {
     'active': 'UP',
     'inactive': 'DOWN'
 }
+
+# MAC address RegEx
+MACSEG = r'[0-9a-fA-F]{1,2}'
+MACADDR = r'(?:%s(?::%s){5})' % (MACSEG, MACSEG)
+
+# IPv4 RegEx
+IPV4SEG = r'(?:25[0-5]|2[0-4][0-9]|1{0,1}[0-9]{1,2})'
+IPV4ADDR = r'(?:%s(?:\.%s){0,3})' % (IPV4SEG, IPV4SEG)
+
+# IPv6 RegEx
+IPV6SEG = r'(?:[0-9a-fA-F]{1,4})'
+IPV6GROUPS = (
+    r'::',
+    r'(?:%s:){1,7}:' % (IPV6SEG),
+    r':(?::%s){1,7}' % (IPV6SEG),
+    r'(?:%s:){1,6}:%s' % (IPV6SEG, IPV6SEG),
+    r'%s:(?::%s){1,6}' % (IPV6SEG, IPV6SEG),
+    r'(?:%s:){1,5}(?::%s){1,2}' % (IPV6SEG, IPV6SEG),
+    r'(?:%s:){1,4}(?::%s){1,3}' % (IPV6SEG, IPV6SEG),
+    r'(?:%s:){1,3}(?::%s){1,4}' % (IPV6SEG, IPV6SEG),
+    r'(?:%s:){1,2}(?::%s){1,5}' % (IPV6SEG, IPV6SEG),
+    r'(?:%s:){7,7}%s' % (IPV6SEG, IPV6SEG),
+)
+IPV6ADDR = '|'.join(['(?:%s(?:%%\w+)?)' % (g) for g in IPV6GROUPS[::-1]])
 
 
 def stderr(text):
@@ -97,6 +122,13 @@ def netmask_to_length(mask):
 
 def ref(obj_id):
     return PyObj_FromPtr(obj_id)
+
+
+def json_dumps(data, pretty=False):
+    if pretty:
+        return json.dumps(data, cls=IpRouteJSON, indent=4)
+    else:
+        return json.dumps(data, separators=(',', ':'))
 
 
 def json_unindent_list(obj):

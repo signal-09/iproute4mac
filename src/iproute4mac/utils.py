@@ -133,8 +133,13 @@ def delete_keys(data, attr):
             d.pop(a, None)
 
 
+# int.bit_count() only in Python >=3.10
+def bit_count(self):
+    return bin(self).count("1")
+
+
 def netmask_to_length(mask):
-    return int(mask, 16).bit_count()
+    return bit_count(int(mask, 16))
 
 
 def ref(obj_id):

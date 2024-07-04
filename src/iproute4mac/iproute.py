@@ -92,25 +92,26 @@ def iproute_list(argv, option):
     routes = netstat.parse(cmd.stdout, option)
     while argv:
         opt = argv.pop(0)
-        if opt == 'table':
+        if matches(opt, 'table'):
             # table = next_arg(argv)
             do_notimplemented()
-        elif opt == 'vrf':
+        elif matches(opt, 'vrf'):
             # tid = next_arg(argv)
             do_notimplemented()
-        elif opt in ('cached', 'cloned'):
+        elif matches(opt, 'cached', 'cloned'):
             do_notimplemented()
-        elif opt in ('tod', 'dsfield'):
+        elif (strcmp(opt, 'tod')
+              or matches(opt, 'dsfield')):
             # tos = next_arg(argv)
             do_notimplemented()
-        elif opt == 'protocol':
+        elif matches(opt, 'protocol'):
             protocol = next_arg(argv)
             if protocol not in ('static', 'redirect', 'kernel', 'all'):
                 invarg('invalid "protocol"', protocol)
             if protocol == 'all':
                 continue
             routes = [route for route in routes if 'protocol' in route and route['protocol'] == protocol]
-        elif opt == 'scope':
+        elif matches(opt, 'scope'):
             scope = next_arg(argv)
             if (scope not in ('link', 'host', 'global', 'all')
                and not scope.isnumeric()):
@@ -119,26 +120,29 @@ def iproute_list(argv, option):
                 continue
             # FIXME: numeric scope?
             routes = [route for route in routes if 'scope' in route and route['scope'] == scope]
-        elif opt == 'type':
+            delete_keys(routes, ['scope'])
+        elif matches(opt, 'type'):
             addr_type = next_arg(argv)
             if addr_type not in ('blackhole', 'broadcast', 'multicast', 'unicast'):
                 invarg('node type value is invalid', addr_type)
             routes = [route for route in routes if (('type' in route and route['type'] == addr_type)
                                                     or ('type' not in route and addr_type == 'unicast'))]
-        elif opt in ('dev', 'oif', 'iif'):
+        elif strcmp(opt, 'dev', 'oif', 'iif'):
             dev = next_arg(argv)
             routes = [route for route in routes if 'dev' in route and route['dev'] == dev]
-        elif opt == 'mark':
+            delete_keys(routes, ['dev'])
+        elif strcmp(opt, 'mark'):
             # tid = next_arg(argv)
             do_notimplemented()
-        elif opt in ('metric', 'priority', 'preference'):
+        elif (matches(opt, 'metric', 'priority')
+              or strcmp(opt, 'preference')):
             metric = next_arg(argv)
             try:
                 metric = int(metric)
             except ValueError:
                 invarg('"metric" value is invalid', metric)
             do_notimplemented()
-        elif opt == 'via':
+        elif strcmp(opt, 'via'):
             via = next_arg(argv)
             family = read_family(via)
             if family == AF_UNSPEC:
@@ -146,32 +150,35 @@ def iproute_list(argv, option):
             else:
                 via = next_arg(argv)
             do_notimplemented()
-        elif opt == 'src':
+        elif strcmp(opt, 'src'):
             # src = next_arg(argv)
             do_notimplemented()
-        elif opt == 'from':
+        elif matches(opt, 'realms'):
+            # realm = next_arg(argv)
+            do_notimplemented()
+        elif matches(opt, 'from'):
             opt = next_arg(argv)
-            if opt == 'root':
+            if matches(opt, 'root'):
                 opt = next_arg(argv)
                 # get_prefix(opt, option['preferred_family'])
-            elif opt == 'match':
+            elif matches(opt, 'match'):
                 opt = next_arg(argv)
                 # get_prefix(opt, option['preferred_family'])
             else:
-                if opt == 'exact':
+                if matches(opt, 'exact'):
                     opt = next_arg(argv)
                 # get_prefix(opt, option['preferred_family'])
         else:
-            if opt == 'to':
+            if matches(opt, 'to'):
                 opt = next_arg(argv)
-            if opt == 'root':
+            if matches(opt, 'root'):
                 opt = next_arg(argv)
                 # get_prefix(opt, option['preferred_family'])
-            elif opt == 'match':
+            elif matches(opt, 'match'):
                 opt = next_arg(argv)
                 # get_prefix(opt, option['preferred_family'])
             else:
-                if opt == 'exact':
+                if matches(opt, 'exact'):
                     opt = next_arg(argv)
                 # get_prefix(opt, option['preferred_family'])
             do_notimplemented()

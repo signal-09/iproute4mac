@@ -134,7 +134,8 @@ def parse(res, option):
                 'dev': dev,
                 'protocol': protocol,
                 'scope': scope,
-                'expire': int(expire) if expire and expire != '!' else None
+                'expire': int(expire) if expire and expire != '!' else None,
+                'flags': []
             }
             routes.append({k: v for k, v in route.items() if v is not None})
 

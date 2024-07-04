@@ -72,11 +72,11 @@ def ipaddr_list(argv, option, usage=usage):
     links = ifconfig.parse(cmd.stdout, option=option)
     while argv:
         opt = argv.pop(0)
-        if opt == 'to':
+        if strcmp(opt, 'to'):
             # to = next_arg(argv)
             # get_prefix(to, option['preferred_family'])
             do_notimplemented()
-        elif opt == 'scope':
+        elif strcmp(opt, 'scope'):
             scope = next_arg(argv)
             if (scope not in ('link', 'host', 'global', 'all')
                and not scope.isnumeric()):
@@ -84,22 +84,22 @@ def ipaddr_list(argv, option, usage=usage):
             if scope == 'all':
                 continue
             do_notimplemented()
-        elif opt == 'up':
+        elif strcmp(opt, 'up'):
             links = [link for link in links if ('flags' in link and 'UP' in link['flags'])]
         # TODO: elif get_filter(opt):
-        elif opt == 'label':
+        elif strcmp(opt, 'label'):
             # label = next_opt(argv)
             do_notimplemented()
-        elif opt == 'group':
+        elif strcmp(opt, 'group'):
             group = next_arg(argv)
             do_notimplemented()
             invarg('Invalid "group" value', group)
-        elif opt == 'master':
+        elif strcmp(opt, 'master'):
             master = next_arg(argv)
             if not any(link['ifname'] == master for link in links):
                 invarg('Device does not exist', master)
             links = [link for link in links if ('master' in link and link['master'] == master)]
-        elif opt == 'vrf':
+        elif strcmp(opt, 'vrf'):
             vrf = next_arg(argv)
             if not any(link['ifname'] == vrf for link in links):
                 invarg('Not a valid VRF name', vrf)
@@ -108,9 +108,9 @@ def ipaddr_list(argv, option, usage=usage):
             # links = [link for link in links if ('master' in link and link['master'] == vrf)]
             # FIXME: https://wiki.netunix.net/freebsd/network/vrf/
             do_notimplemented()
-        elif opt == 'nomaster':
+        elif strcmp(opt, 'nomaster'):
             links = [link for link in links if 'master' not in link]
-        elif opt == 'type':
+        elif strcmp(opt, 'type'):
             kind = next_arg(argv)
             if kind.endswith('_slave'):
                 kind = kind.replace('_slave', '')
@@ -118,9 +118,9 @@ def ipaddr_list(argv, option, usage=usage):
             else:
                 links = [link for link in links if recurse_in(link, ['linkinfo', 'info_kind'], kind)]
         else:
-            if opt == 'dev':
+            if strcmp(opt, 'dev'):
                 opt = next_arg(argv)
-            elif opt == 'help':
+            elif matches(opt, 'help'):
                 usage()
             links = [link for link in links if link['ifname'] == opt]
             if not links:

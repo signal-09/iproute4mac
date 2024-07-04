@@ -61,7 +61,7 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
 #           vcan | veth | vlan | vrf | vti | vxcan | vxlan | wwan |
 #           xfrm }
 def ipaddr_list(argv, option, usage=usage):
-    cmd = subprocess.run(['ifconfig', '-v', '-a'],
+    cmd = subprocess.run(['ifconfig', '-v', '-L', '-a',],
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE,
                          encoding="utf-8")

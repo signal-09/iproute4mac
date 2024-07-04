@@ -45,6 +45,12 @@ def dumps(links, option):
             if 'broadcast' in addr:
                 stdout(' brd ', addr['broadcast'])
             stdout(end='\n')
+            if 'valid_life_time' in addr and 'preferred_life_time' in addr:
+                stdout('       valid_lft ',
+                       'forever' if bit_count(addr['valid_life_time']) == 32 else addr['valid_life_time'],
+                       ' preferred_lft ',
+                       'forever' if bit_count(addr['preferred_life_time']) == 32 else addr['preferred_life_time'])
+                stdout(end='\n')
 
 
 class ifconfigRegEx:
@@ -58,10 +64,13 @@ class ifconfigRegEx:
                        r'(?: --> (?P<address>\d+\.\d+\.\d+\.\d+))?'
                        r' netmask (?P<netmask>0x[0-9a-f]{8})'
                        r'(?: broadcast (?P<broadcast>\d+\.\d+\.\d+\.\d+))?')
-    _inet6 = re.compile(r'\s+inet6 (?P<local>[0-9a-f:]*::[0-9a-f:]+)(?:%\w+)?'
+    _inet6 = re.compile(r'\s+inet6 (?P<local>{})(?:%\w+)?'
                         r' prefixlen (?P<prefixlen>\d+)'
+                        r'(?: (?P<autoconf>autoconf))?'
                         r'(?: (?P<secured>secured))?'
-                        r'(?: scopeid (?P<scopeid>0x[0-9a-f]+))?')
+                        r'(?: pltime (?P<pltime>\d+))?'
+                        r'(?: vltime (?P<vltime>\d+))?'
+                        r'(?: scopeid (?P<scopeid>0x[0-9a-f]+))?'.format(IPV6ADDR))
     _state = re.compile(r'\s+status: (?P<state>\w+)')
     _vlan = re.compile(r'\s+vlan: (?P<vlanid>\d+) parent interface: (?P<parent><?\w+>?)')
     _bond = re.compile(r'\s+bond interfaces: (\w+(?: \w+)*)')
@@ -175,23 +184,29 @@ def parse(res, option):
         elif match.state:
             link['operstate'] = oper_states[match.state.group('state')]
         elif match.inet and option['preferred_family'] in (AF_INET, AF_UNSPEC):
-            a = match.inet.groupdict()
+            inet = match.inet.groupdict()
             addr = {
                 'family': 'inet',
-                'local': a['local']
+                'local': inet['local']
             }
-            if a['address']:
-                addr['address'] = a['address']
-            addr['prefixlen'] = netmask_to_length(a['netmask'])
-            if a['broadcast']:
-                addr['broadcast'] = a['broadcast']
+            if inet['address']:
+                addr['address'] = inet['address']
+            addr['prefixlen'] = netmask_to_length(inet['netmask'])
+            if inet['broadcast']:
+                addr['broadcast'] = inet['broadcast']
+            addr.update({
+                'valid_life_time': 4294967295,
+                'preferred_life_time': 4294967295
+            })
             link['addr_info'] = link.get('addr_info', []) + [addr]
         elif match.inet6 and option['preferred_family'] in (AF_INET6, AF_UNSPEC):
-            a = match.inet6.groupdict()
+            inet6 = match.inet6.groupdict()
             addr = {
                 'family': 'inet6',
-                'local': a['local'],
-                'prefixlen': int(a['prefixlen'])
+                'local': inet6['local'],
+                'prefixlen': int(inet6['prefixlen']),
+                'valid_life_time': int(inet6['vltime']) if inet6['vltime'] else 4294967295,
+                'preferred_life_time': int(inet6['pltime']) if inet6['pltime'] else 4294967295
             }
             link['addr_info'] = link.get('addr_info', []) + [addr]
         elif match.vlan:

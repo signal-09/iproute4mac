@@ -60,6 +60,9 @@ IPV6GROUPS = (
 IPV6ADDR = '|'.join(['(?:%s)' % (g) for g in IPV6GROUPS[::-1]])
 IPV6ADDR = r'(?:%s)(?:%%\w+)?' % IPV6ADDR
 
+# nu <netinet6/nd6.h>
+ND6_INFINITE_LIFETIME = 0xffffffff
+
 
 def stdout(*args, sep='', end=''):
     print(*args, sep=sep, end=end)

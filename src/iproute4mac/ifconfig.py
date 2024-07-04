@@ -47,9 +47,9 @@ def dumps(links, option):
             stdout(end='\n')
             if 'valid_life_time' in addr and 'preferred_life_time' in addr:
                 stdout('       valid_lft ',
-                       'forever' if bit_count(addr['valid_life_time']) == 32 else addr['valid_life_time'],
+                       'forever' if addr['valid_life_time'] == ND6_INFINITE_LIFETIME else addr['valid_life_time'],
                        ' preferred_lft ',
-                       'forever' if bit_count(addr['preferred_life_time']) == 32 else addr['preferred_life_time'])
+                       'forever' if addr['preferred_life_time'] == ND6_INFINITE_LIFETIME else addr['preferred_life_time'])
                 stdout(end='\n')
 
 
@@ -173,6 +173,8 @@ def parse(res, option):
                 link['linkinfo'] = {'info_kind': re.sub(r'[0-9]+', '', link['ifname'])}
 
             links.append(link)
+            inet_count = 0
+            inet6_count = 0
             continue
 
         if match.eflags:
@@ -195,20 +197,28 @@ def parse(res, option):
             if inet['broadcast']:
                 addr['broadcast'] = inet['broadcast']
             addr.update({
-                'valid_life_time': 4294967295,
-                'preferred_life_time': 4294967295
+                'valid_life_time': ND6_INFINITE_LIFETIME,
+                'preferred_life_time': ND6_INFINITE_LIFETIME
             })
-            link['addr_info'] = link.get('addr_info', []) + [addr]
+            if inet_count + inet6_count > 0:
+                link['addr_info'].insert(inet_count, addr)
+            else:
+                link['addr_info'] = [addr]
+            inet_count += 1
         elif match.inet6 and option['preferred_family'] in (AF_INET6, AF_UNSPEC):
             inet6 = match.inet6.groupdict()
             addr = {
                 'family': 'inet6',
                 'local': inet6['local'],
                 'prefixlen': int(inet6['prefixlen']),
-                'valid_life_time': int(inet6['vltime']) if inet6['vltime'] else 4294967295,
-                'preferred_life_time': int(inet6['pltime']) if inet6['pltime'] else 4294967295
+                'valid_life_time': int(inet6['vltime']) if inet6['vltime'] else ND6_INFINITE_LIFETIME,
+                'preferred_life_time': int(inet6['pltime']) if inet6['pltime'] else ND6_INFINITE_LIFETIME
             }
-            link['addr_info'] = link.get('addr_info', []) + [addr]
+            if inet_count + inet6_count > 0:
+                link['addr_info'].append(addr)
+            else:
+                link['addr_info'] = [addr]
+            inet6_count += 1
         elif match.vlan:
             parent = match.vlan.group('parent')
             if parent != '<none>':

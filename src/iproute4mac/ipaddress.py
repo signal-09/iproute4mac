@@ -122,7 +122,7 @@ def ipaddr_list(argv, option, usage=usage):
                 dev = next_arg(argv)
             elif opt == 'help':
                 usage()
-            links = [link for link in links if link['ifname'] == dev]
+            links = [link for link in links if link['ifname'] == opt]
             if not links:
                 stderr('Device "%s" does not exist.' % opt)
                 exit(-1)

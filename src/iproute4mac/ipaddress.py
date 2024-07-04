@@ -119,7 +119,7 @@ def ipaddr_list(argv, option, usage=usage):
                 links = [link for link in links if recurse_in(link, ['linkinfo', 'info_kind'], kind)]
         else:
             if opt == 'dev':
-                dev = next_arg(argv)
+                opt = next_arg(argv)
             elif opt == 'help':
                 usage()
             links = [link for link in links if link['ifname'] == opt]

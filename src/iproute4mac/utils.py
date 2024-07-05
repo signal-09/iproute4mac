@@ -202,17 +202,11 @@ class IpRouteJSON(json.JSONEncoder):
 
 
 def strcmp(opt, *args):
-    for arg in args:
-        if arg == opt:
-            return True
-    return False
+    return any(arg == opt for arg in args)
 
 
 def matches(opt, *args):
-    for arg in args:
-        if arg.startswith(opt):
-            return True
-    return False
+    return any(arg.startswith(opt) for arg in args)
 
 
 def matches_color(opt):

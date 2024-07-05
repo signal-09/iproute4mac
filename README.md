@@ -32,28 +32,32 @@ brew install signal-09/repo/iproute4mac --HEAD
 
 ### `ip address show`: look at protocol addresses
 
-> Syntax:
+Implemented syntax:
+
+> ip address [ show [ dev IFNAME ] [ ~~scope SCOPE-ID~~ ] [ master DEVICE | nomaster ]
+>                   [ type TYPE ] [ ~~to PREFIX~~ ] [ ~~FLAG-LIST~~ ]
+>                   [ ~~label LABEL~~ ] [up] [ ~~vrf NAME~~ ] ]
 >
-> ```
-ip address [ show [ dev IFNAME ] [ scope SCOPE-ID ] [ master DEVICE ]
-                  [ type TYPE ] [ to PREFIX ] [ FLAG-LIST ]
-                  [ label LABEL ] [up] [ vrf NAME ] ]
-SCOPE-ID := [ host | link | global | NUMBER ]
-FLAG-LIST := [ FLAG-LIST ] FLAG
-FLAG  := [ permanent | dynamic | secondary | primary |
-           [-]tentative | [-]deprecated | [-]dadfailed | temporary |
-           CONFFLAG-LIST ]
-CONFFLAG-LIST := [ CONFFLAG-LIST ] CONFFLAG
-CONFFLAG  := [ home | nodad | mngtmpaddr | noprefixroute | autojoin ]
-TYPE := { bareudp | bond | bond_slave | bridge | bridge_slave |
-          dummy | erspan | geneve | gre | gretap | ifb |
-          ip6erspan | ip6gre | ip6gretap | ip6tnl |
-          ipip | ipoib | ipvlan | ipvtap |
-          macsec | macvlan | macvtap |
-          netdevsim | nlmon | rmnet | sit | team | team_slave |
-          vcan | veth | vlan | vrf | vti | vxcan | vxlan | wwan |
-          xfrm }
-```
+> ~~SCOPE-ID := [ host | link | global | NUMBER ]~~
+>
+> ~~FLAG-LIST := [ FLAG-LIST ] FLAG~~
+>
+> ~~FLAG  := [ permanent | dynamic | secondary | primary |
+>            [-]tentative | [-]deprecated | [-]dadfailed | temporary |
+>            CONFFLAG-LIST ]~~
+>
+> ~~CONFFLAG-LIST := [ CONFFLAG-LIST ] CONFFLAG~~
+>
+> ~~CONFFLAG  := [ home | nodad | mngtmpaddr | noprefixroute | autojoin ]~~
+>
+> TYPE := { ~~bareudp~~ | bond | bond_slave | bridge | bridge_slave |
+>           ~~dummy~~ | ~~erspan~~ | ~~geneve~~ | ~~gre~~ | ~~gretap~~ | ~~ifb~~ |
+>           ~~ip6erspan~~ | ~~ip6gre~~ | ~~ip6gretap~~ | ~~ip6tnl~~ |
+>           ~~ipip~~ | ~~ipoib~~ | ~~ipvlan~~ | ~~ipvtap~~ |
+>           ~~macsec~~ | ~~macvlan~~ | ~~macvtap~~ |
+>           ~~netdevsim~~ | ~~nlmon~~ | ~~rmnet~~ | ~~sit~~ | ~~team~~ | ~~team_slave~~ |
+>           ~~vcan~~ | ~~veth~~ | vlan | ~~vrf~~ | ~~vti~~ | ~~vxcan~~ | ~~vxlan~~ | ~~wwan~~ |
+>           ~~xfrm~~ }
 
 Shows IPv4 and IPv6 addresses assigned to all network interfaces. The 'show' subcommand can be omitted:
 
@@ -81,40 +85,65 @@ ip -4 address show master bridge0
 
 #### Notes
 
-1. `qdisc` (queuing discipline) is part of the Linux Traffic Control subsystem (TC) via the `tc` utility. Even if this information is not reported, similar results in traffic control and shaping can be achieved using `dnctl` and `pfctl`.
+1. `qdisc` (queuing discipline) is part of the Linux Traffic Control subsystem (TC) managed via the `tc` utility. Even if this information is not reported, similar results in traffic control and shaping can be achieved using `dnctl` and `pfctl`.
 2. `address lifetime` for IPv6 addresses (-L flag of `ifconfig`) is not provided anymore in Sonoma (macOS 14); for IPv4, addresses *valid* and *prederred* lifetime, is supposed *forever* (0xffffffff = 4.294.967.295 = 32 bit).
 
 ### `ip link show`: display device attributes
 
-> Syntax:
+Implemented syntax:
+
+> ip link show [ DEVICE | group GROUP ] [ up ] [ master DEVICE ] [ type ETYPE ] [ vrf NAME ]
 >
-> ```
-ip link show [ DEVICE | group GROUP ] [ up ] [ master DEVICE ] [ type ETYPE ] [ vrf NAME ]
-TYPE := [ bridge | bond | can | dummy | hsr | ifb | ipoib | macvlan | macvtap
-        | vcan | vxcan | veth | vlan | vxlan | ip6tnl | ipip | sit | gre
-        | gretap | erspan | ip6gre | ip6gretap | ip6erspan | vti | nlmon
-        | ipvlan | ipvtap | lowpan | geneve | bareudp | vrf | macsec
-        | netdevsim | rmnet | xfrm ]
-ETYPE := [ TYPE | bridge_slave | bond_slave ]
+> ETYPE := [ TYPE | bridge_slave | bond_slave ]
+>
+> TYPE := [ bridge | bond | can | dummy | hsr | ifb | ipoib | macvlan | macvtap
+>         | vcan | vxcan | veth | vlan | vxlan | ip6tnl | ipip | sit | gre
+>         | gretap | erspan | ip6gre | ip6gretap | ip6erspan | vti | nlmon
+>         | ipvlan | ipvtap | lowpan | geneve | bareudp | vrf | macsec
+>         | netdevsim | rmnet | xfrm ]
+
+Shows the state of all network interfaces on the system:
+
+```shell
+ip link show
+```
+
+Shows the bridge devices:
+
+```shell
+ip link show type bridge
+```
+
+Shows the vlan devices:
+```shell
+ip link show type vlan
+```
+
+Shows devices enslaved by bridge0
+```shell
+ip link show master bridge0
 ```
 
 ### `ip route show`: list routes
 
-> Syntax:
+Implemented syntax:
+
+> ip route [ show [ SELECTOR ] ]
 >
->```
-ip route [ list [ SELECTOR ] ]
-SELECTOR := [ root PREFIX ] [ match PREFIX ] [ exact PREFIX ]
-            [ table TABLE_ID ] [ vrf NAME ] [ proto RTPROTO ]
-            [ type TYPE ] [ scope SCOPE ]
-TYPE := { unicast | local | broadcast | multicast | throw |
-          unreachable | prohibit | blackhole | nat }
-TABLE_ID := [ local | main | default | all | NUMBER ]
-SCOPE := [ host | link | global | NUMBER ]
-RTPROTO := [ kernel | boot | static | NUMBER ]
-```
+> SELECTOR := [ ~~root PREFIX~~ ] [ ~~match PREFIX~~ ] [ ~~exact PREFIX~~ ]
+>             [ ~~table TABLE_ID~~ ] [ ~~vrf NAME~~ ] [ proto RTPROTO ]
+>             [ type TYPE ] [ scope SCOPE ]
+>
+> TYPE := { unicast | ~~local~~ | broadcast | multicast | ~~throw~~ |
+>           ~~unreachable~~ | ~~prohibit~~ | blackhole | ~~nat~~ }
+>
+> ~~TABLE_ID := [ local | main | default | all | NUMBER ]~~
+>
+> SCOPE := [ host | link | global | ~~NUMBER~~ ]
+>
+> RTPROTO := [ kernel | ~~boot~~ | static | ~~NUMBER~~ ]
 
 #### Notes
 
 1. `iif` is not honored (is treated like `dev` and `oif`).
-2. Tables are not implemented in macOS (Darwin)
+2. *Route tables* are not implemented in macOS (Darwin).

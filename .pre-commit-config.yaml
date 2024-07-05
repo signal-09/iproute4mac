@@ -1,0 +1,22 @@
+default_language_version:
+  python: python3
+repos:
+- repo: https://github.com/pycqa/flake8
+  rev: 7.1.0
+  hooks:
+  - id: flake8
+    pass_filenames: false
+    args: [
+      src,
+      --select, 'E9,F63,F7,F82',
+      --show-source,
+      --statistics
+    ]
+  - id: flake8
+    pass_filenames: false
+    args: [
+      src,
+      --max-line-length=128,
+      --statistics,
+      --ignore, 'F403,F405,W503'
+    ]

@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.1.2'
+VERSION = '0.1.3'
 DESCRIPTION = 'iproute for Mac'
 with open('README.md', 'r') as f:
     LONG_DESCRIPTION = f.read()

@@ -6,8 +6,9 @@ from _ctypes import PyObj_FromPtr
 
 
 ''' Costants '''
-# Linux Address families
+# socket.h
 AF_UNSPEC = 0
+AF_UNIX = 1
 AF_INET = 2
 AF_BRIDGE = 7
 AF_INET6 = 10
@@ -28,11 +29,43 @@ address_families = [
 EXIT_FAILURE = 1
 EXIT_SUCCESS = 0
 
-# maps operstates
+# map operstates
 oper_states = {
     'active': 'UP',
     'inactive': 'DOWN'
 }
+
+# MAC address RegEx
+MACSEG = r'[0-9a-fA-F]{1,2}'
+MACADDR = r'(?:%s(?::%s){5})' % (MACSEG, MACSEG)
+
+# IPv4 RegEx
+IPV4SEG = r'(?:25[0-5]|2[0-4][0-9]|1{0,1}[0-9]{1,2})'
+IPV4ADDR = r'(?:%s(?:\.%s){0,3})' % (IPV4SEG, IPV4SEG)
+
+# IPv6 RegEx
+IPV6SEG = r'(?:[0-9a-fA-F]{1,4})'
+IPV6GROUPS = (
+    r'::',
+    r'(?:%s:){1,7}:' % (IPV6SEG),
+    r':(?::%s){1,7}' % (IPV6SEG),
+    r'(?:%s:){1,6}:%s' % (IPV6SEG, IPV6SEG),
+    r'%s:(?::%s){1,6}' % (IPV6SEG, IPV6SEG),
+    r'(?:%s:){1,5}(?::%s){1,2}' % (IPV6SEG, IPV6SEG),
+    r'(?:%s:){1,4}(?::%s){1,3}' % (IPV6SEG, IPV6SEG),
+    r'(?:%s:){1,3}(?::%s){1,4}' % (IPV6SEG, IPV6SEG),
+    r'(?:%s:){1,2}(?::%s){1,5}' % (IPV6SEG, IPV6SEG),
+    r'(?:%s:){7,7}%s' % (IPV6SEG, IPV6SEG),
+)
+IPV6ADDR = '|'.join(['(?:%s)' % (g) for g in IPV6GROUPS[::-1]])
+IPV6ADDR = r'(?:%s)(?:%%\w+)?' % IPV6ADDR
+
+# nu <netinet6/nd6.h>
+ND6_INFINITE_LIFETIME = 0xffffffff
+
+
+def stdout(*args, sep='', end=''):
+    print(*args, sep=sep, end=end)
 
 
 def stderr(text):
@@ -50,6 +83,18 @@ def missarg(key):
 
 def invarg(msg, arg):
     error('argument "%s" is wrong: %s' % (arg, msg))
+
+
+def incomplete_command():
+    stderr('Command line is not complete. Try option "help"')
+    exit(-1)
+
+
+def next_arg(argv):
+    try:
+        return argv.pop(0)
+    except IndexError:
+        incomplete_command()
 
 
 def read_family(name):
@@ -91,12 +136,24 @@ def delete_keys(data, attr):
             d.pop(a, None)
 
 
+# int.bit_count() only in Python >=3.10
+def bit_count(self):
+    return bin(self).count("1")
+
+
 def netmask_to_length(mask):
-    return int(mask, 16).bit_count()
+    return bit_count(int(mask, 16))
 
 
 def ref(obj_id):
     return PyObj_FromPtr(obj_id)
+
+
+def json_dumps(data, pretty=False):
+    if pretty:
+        return json.dumps(data, cls=IpRouteJSON, indent=4)
+    else:
+        return json.dumps(data, separators=(',', ':'))
 
 
 def json_unindent_list(obj):
@@ -142,6 +199,20 @@ class IpRouteJSON(json.JSONEncoder):
         json_repr = re.sub(r'},\n\s+{', r'},{', json_repr)
         json_repr = re.sub(r'}\n\s*\]', r'} ]', json_repr)
         return json_repr
+
+
+def strcmp(opt, *args):
+    for arg in args:
+        if arg == opt:
+            return True
+    return False
+
+
+def matches(opt, *args):
+    for arg in args:
+        if arg.startswith(opt):
+            return True
+    return False
 
 
 def matches_color(opt):

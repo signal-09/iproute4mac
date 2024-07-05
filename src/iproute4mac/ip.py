@@ -4,8 +4,9 @@ import sys
 
 import iproute4mac
 from iproute4mac.utils import *
-from iproute4mac.iplink import *
-from iproute4mac.ipaddress import *
+from iproute4mac.iplink import do_iplink
+from iproute4mac.ipaddress import do_ipaddr
+from iproute4mac.iproute import do_iproute
 
 
 def do_help(argv=[], option={}):
@@ -37,7 +38,7 @@ objs = [
     ('address', do_ipaddr),
     ('addrlabel', do_notimplemented),
     ('maddress', do_notimplemented),
-    ('route', do_notimplemented),
+    ('route', do_iproute),
     ('rule', do_notimplemented),
     ('neighbor', do_notimplemented),
     ('neighbour', do_notimplemented),

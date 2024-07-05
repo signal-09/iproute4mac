@@ -1,12 +1,8 @@
-import iproute4mac.ifconfig as ifconfig
 from iproute4mac.utils import *
+from iproute4mac.ipaddress import ipaddr_list
 
 
-''' Options '''
-option = {}
-
-
-def do_iplink_usage():
+def usage():
     stderr("""\
 Usage: ip link add [link DEV | parentdev NAME] [ name ] NAME
                    [ txqueuelen PACKETS ]
@@ -89,25 +85,20 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
 #         | ipvlan | ipvtap | lowpan | geneve | bareudp | vrf | macsec
 #         | netdevsim | rmnet | xfrm ]
 # ETYPE := [ TYPE | bridge_slave | bond_slave ]
-def do_iplink_list(argv=[]):
-    links = ifconfig.links(argv, option)
-    delete_keys(links, ['addr_info'])
-    ifconfig.dumps(links, option)
-    return EXIT_SUCCESS
+def iplink_list(argv, option):
+    option['preferred_family'] = AF_PACKET
+    return ipaddr_list(argv, option, usage)
 
 
-def do_iplink(argv=[], opts={}):
-    global option
-    option = opts
-
+def do_iplink(argv, option):
     if not argv:
-        return do_iplink_list()
+        return iplink_list(argv, option)
 
     cmd = argv.pop(0)
     if 'add'.startswith(cmd):
         return do_notimplemented()
-    elif ('set'.startswith(cmd)
-          or 'change'.startswith(cmd)):
+    elif ('change'.startswith(cmd)
+          or 'set'.startswith(cmd)):
         return do_notimplemented()
     elif 'replace'.startswith(cmd):
         return do_notimplemented()
@@ -116,7 +107,7 @@ def do_iplink(argv=[], opts={}):
     elif ('show'.startswith(cmd)
           or 'lst'.startswith(cmd)
           or 'list'.startswith(cmd)):
-        return do_iplink_list(argv)
+        return iplink_list(argv, option)
     elif 'xstats'.startswith(cmd):
         return do_notimplemented()
     elif 'afstats'.startswith(cmd):
@@ -124,7 +115,7 @@ def do_iplink(argv=[], opts={}):
     elif 'property'.startswith(cmd):
         return do_notimplemented()
     elif 'help'.startswith(cmd):
-        return do_iplink_usage()
+        return usage()
 
     stderr('Command "%s" is unknown, try "ip link help".' % cmd)
     exit(-1)

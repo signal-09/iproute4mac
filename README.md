@@ -10,20 +10,45 @@ This is a macOS network wrapper to imitate GNU/Linux [iproute2](https://wiki.lin
 
 ## Installation
 
-In order to use this tap, you need to install [Homebrew](https://brew.sh).
+### Homebrew
 
-Then, to run a default installation, run:
+The preferred method of installation is [Homebrew](https://brew.sh).
+
+In order to use this tap, you can install directly the package:
 
 ```shell
-brew install signal-09/repo/iproute4mac
+brew install signal-09/tap/iproute4mac
 ```
 
-### Installing latest Git version (`HEAD`)
+Or subscribe the tap [repository](https://github.com/signal-09/homebrew-tap) and then install the package:
+
+```shell
+brew tap signal-09/tap
+brew install iproute4mac
+```
+
+#### Installing latest Git version (`HEAD`)
 
 You can install the latest Git version by adding the `--HEAD` option:
 
 ```shell
-brew install signal-09/repo/iproute4mac --HEAD
+brew install signal-09/tap/iproute4mac --HEAD
+```
+
+### PyPI
+
+Create a Virtual Environment and upgrade `pip` module:
+
+```shell
+python3 -m venv venv
+source venv/bin/activate
+python3 -m pip install -U pip
+```
+
+Then install `iproute4mac`:
+
+```shell
+python3 -m pip install iproute4mac
 ```
 
 ## Usage
@@ -92,15 +117,15 @@ ip -4 address show master bridge0
 
 Implemented syntax:
 
-> ip link show [ DEVICE | group GROUP ] [ up ] [ master DEVICE ] [ type ETYPE ] [ vrf NAME ]
+> ip link show [ DEVICE | ~~group GROUP~~ ] [ up ] [ master DEVICE | nomaster ] [ type ETYPE ] [ ~~vrf NAME~~ ]
 >
 > ETYPE := [ TYPE | bridge_slave | bond_slave ]
 >
-> TYPE := [ bridge | bond | can | dummy | hsr | ifb | ipoib | macvlan | macvtap
->         | vcan | vxcan | veth | vlan | vxlan | ip6tnl | ipip | sit | gre
->         | gretap | erspan | ip6gre | ip6gretap | ip6erspan | vti | nlmon
->         | ipvlan | ipvtap | lowpan | geneve | bareudp | vrf | macsec
->         | netdevsim | rmnet | xfrm ]
+> TYPE := [ bridge | bond | ~~can~~ | ~~dummy~~ | ~~hsr~~ | ~~ifb~~ | ~~ipoib~~ | ~~macvlan~~ | ~~macvtap~~
+>         | ~~vcan~~ | ~~vxcan~~ | ~~veth~~ | vlan | ~~vxlan~~ | ~~ip6tnl~~ | ~~ipip~~ | ~~sit~~ | ~~gre~~
+>         | ~~gretap~~ | ~~erspan~~ | ~~ip6gre~~ | ~~ip6gretap~~ | ~~ip6erspan~~ | ~~vti~~ | ~~nlmon~~
+>         | ~~ipvlan~~ | ~~ipvtap~~ | ~~lowpan~~ | ~~geneve~~ | ~~bareudp~~ | ~~vrf~~ | ~~macsec~~
+>         | ~~netdevsim~~ | ~~rmnet~~ | ~~xfrm~~ ]
 
 Shows the state of all network interfaces on the system:
 
@@ -147,3 +172,62 @@ Implemented syntax:
 
 1. `iif` is not honored (is treated like `dev` and `oif`).
 2. *Route tables* are not implemented in macOS (Darwin).
+
+## Contributing
+
+Every contribute is welcome!
+
+### Fork the repository
+
+![Fork button](https://docs.github.com/assets/cb-34352/mw-1440/images/help/repository/fork-button.webp "Fork")
+
+### Clone the fork
+
+```shell
+git clone https://github.com/YOUR-USERNAME/iproute4mac
+```
+
+### Create a branch
+
+Before making changes to the project, you should create a new branch and check it out (see "[GitHub flow](https://docs.github.com/en/get-started/using-github/github-flow#following-github-flow)").
+
+```shell
+git branch BRANCH-NAME
+git checkout BRANCH-NAME
+```
+
+### Create a developer environment
+
+```shell
+python3 -m venv venv
+source venv/bin/activate
+```
+
+Then install requiered packages:
+
+```shell
+python3 -m pip install -U pip
+python3 -m pip install pre-commit pytest flake8
+pre-commit install
+```
+
+### Coding style
+
+[Flake8](https://flake8.pycqa.org/en/latest/) is used to enforce coding style.
+You can checkout the compliance with the following command:
+
+```shell
+pre-commit run --all-files --show-diff-on-failure
+```
+
+### Commit your work
+
+Create as few commit as possible to make diff checking easier. In case of modification of already pushed commit, amend it if possible:
+
+```shell
+git add -A
+git commit --amend
+git push --force
+```
+
+In case of multiple and not organic commits, "[Squash and merge](https://docs.github.com/pull-requests/collaborating-with-pull-requests/incorporating-changes-from-a-pull-request/about-pull-request-merges#squash-and-merge-your-commits)" policy will be applied.

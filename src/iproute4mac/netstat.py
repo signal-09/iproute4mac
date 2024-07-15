@@ -44,27 +44,28 @@ def dumps(routes, option):
             stdout(route['type'] if 'type' in route else 'unicast', ' ')
         stdout(route['dst'])
         if 'gateway' in route:
-            stdout(' via %s' % route['gateway'])
-        stdout(' dev %s' % route['dev'])
+            stdout(f" via {route['gateway']}")
+        if 'dev' in route:
+            stdout(f" dev {route['dev']}")
         if 'protocol' in route:
-            stdout(' proto %s' % route['protocol'])
+            stdout(f" proto {route['protocol']}")
         if 'scope' in route:
-            stdout(' scope %s' % route['scope'])
+            stdout(f" scope {route['scope']}")
         if 'prefsrc' in route:
-            stdout(' src %s' % route['src'])
+            stdout(f" src {route['src']}")
         stdout(end='\n')
 
 
 class netstatRegEx:
-    _ipv4 = re.compile(r'(?P<dst>(?:default|%s))(?:/(?P<prefix>\d+))?' % (IPV4ADDR)
-                       + r'\s+(?P<gateway>%s|%s|link#\d+)' % (IPV4ADDR, MACADDR))
-    _ipv6 = re.compile(r'(?P<dst>(?:default|%s))(?:/(?P<prefix>\d+))?' % (IPV6ADDR)
-                       + r'\s+(?P<gateway>%s|%s|link#\d+)' % (IPV6ADDR, MACADDR))
-    _route = re.compile(r'(?P<dst>(?:default|%s|%s))(?:/(?P<prefix>\d+))?' % (IPV4ADDR, IPV6ADDR)
-                        + r'\s+(?P<gateway>%s|%s|%s|link#\d+)' % (IPV4ADDR, IPV6ADDR, MACADDR)
-                        + r'\s+(?P<flags>\w+)'
-                        + r'\s+(?P<dev>\w+)'
-                        + r'\s+(?P<expire>\S+)?')
+    _ipv4 = re.compile(fr'(?P<dst>(?:default|{IPV4ADDR}))(?:/(?P<prefix>\d+))?'
+                       fr'\s+(?P<gateway>{IPV4ADDR}|{LLADDR}|link#\d+)')
+    _ipv6 = re.compile(fr'(?P<dst>(?:default|{IPV6ADDR}))(?:/(?P<prefix>\d+))?'
+                       fr'\s+(?P<gateway>{IPV6ADDR}|{LLADDR}|link#\d+)')
+    _route = re.compile(fr'(?P<dst>(?:default|{IPV4ADDR}|{IPV6ADDR}))(?:/(?P<prefix>\d+))?'
+                        fr'\s+(?P<gateway>{IPV4ADDR}|{IPV6ADDR}|{LLADDR}|link#\d+)'
+                        r'\s+(?P<flags>\w+)'
+                        r'\s+(?P<dev>\w+)'
+                        r'\s+(?P<expire>\S+)?')
 
     def __init__(self, line):
         self.ipv4 = self._ipv4.match(line)
@@ -94,7 +95,7 @@ def parse(res, option):
                     if not prefix:
                         prefix = 8 * (dots + 1)
             if prefix:
-                dst = '%s/%s' % (dst, prefix)
+                dst = f'{dst}/{prefix}'
 
             # protocol
             if RTF_STATIC in flags:
@@ -105,7 +106,7 @@ def parse(res, option):
                 protocol = 'kernel'
 
             # scope
-            if gateway.startswith('link#') or re.search(MACADDR, gateway):
+            if gateway.startswith('link#') or re.search(LLADDR, gateway):
                 scope = 'link'
                 gateway = None
             elif RTF_HOST in flags:

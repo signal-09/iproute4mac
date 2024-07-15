@@ -78,7 +78,7 @@ def do_obj(argv, option):
         if o.startswith(obj):
             return f(argv, option)
 
-    stderr('Object "%s" is unknown, try "ip help".' % obj)
+    stderr(f'Object "{obj}" is unknown, try "ip help".')
     return EXIT_FAILURE
 
 
@@ -164,7 +164,7 @@ def main():
             option['timestamp'] = True
             option['timestamp_short'] = True
         elif '-Version'.startswith(opt):
-            print('ip wrapper, iproute4mac-%s' % iproute4mac.VERSION)
+            print(f'ip wrapper, iproute4mac-{iproute4mac.VERSION}')
             exit(0)
         elif '-force'.startswith(opt):
             option['force'] = True
@@ -200,7 +200,7 @@ def main():
         elif opt == '-echo':
             option['echo_request'] = True
         else:
-            stderr('Option "%s" is unknown, try "ip -help".' % opt)
+            stderr(f'Option "{opt}" is unknown, try "ip -help".')
             exit(-1)
 
     if batch_file:

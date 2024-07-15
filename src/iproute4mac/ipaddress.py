@@ -79,7 +79,7 @@ def ipaddr_list(argv, option, usage=usage):
         elif strcmp(opt, 'scope'):
             scope = next_arg(argv)
             if (scope not in ('link', 'host', 'global', 'all')
-               and not scope.isnumeric()):
+               and not scope.isdigit()):
                 invarg('invalid "scope"', scope)
             if scope == 'all':
                 continue
@@ -124,11 +124,11 @@ def ipaddr_list(argv, option, usage=usage):
                 usage()
             links = [link for link in links if link['ifname'] == opt]
             if not links:
-                stderr('Device "%s" does not exist.' % opt)
+                stderr(f'Device "{opt}" does not exist.')
                 exit(-1)
 
     if not option['show_details']:
-        delete_keys(links, ['linkinfo'])
+        delete_keys(links, 'linkinfo')
 
     if option['preferred_family'] in (AF_INET, AF_INET6, AF_MPLS, AF_BRIDGE):
         family = family_name(option['preferred_family'])
@@ -138,7 +138,7 @@ def ipaddr_list(argv, option, usage=usage):
             )
         ]
     elif option['preferred_family'] == AF_PACKET:
-        delete_keys(links, ['addr_info'])
+        delete_keys(links, 'addr_info')
 
     ifconfig.dumps(links, option)
     return EXIT_SUCCESS
@@ -173,5 +173,5 @@ def do_ipaddr(argv, option):
     elif 'help'.startswith(cmd):
         return usage()
 
-    stderr('Command "%s" is unknown, try "ip address help".' % cmd)
+    stderr(f'Command "{cmd}" is unknown, try "ip address help".')
     exit(-1)

@@ -117,5 +117,5 @@ def do_iplink(argv, option):
     elif 'help'.startswith(cmd):
         return usage()
 
-    stderr('Command "%s" is unknown, try "ip link help".' % cmd)
+    stderr(f'Command "{cmd}" is unknown, try "ip link help".')
     exit(-1)

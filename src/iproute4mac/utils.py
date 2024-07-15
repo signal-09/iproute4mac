@@ -36,29 +36,29 @@ oper_states = {
 }
 
 # MAC address RegEx
-MACSEG = r'[0-9a-fA-F]{1,2}'
-MACADDR = r'(?:%s(?::%s){5})' % (MACSEG, MACSEG)
+LLSEG = '[0-9a-fA-F]{1,2}'
+LLADDR = '(?:%s(?::%s){5})' % (LLSEG, LLSEG)
 
 # IPv4 RegEx
-IPV4SEG = r'(?:25[0-5]|2[0-4][0-9]|1{0,1}[0-9]{1,2})'
+IPV4SEG = '(?:25[0-5]|2[0-4][0-9]|1{0,1}[0-9]{1,2})'
 IPV4ADDR = r'(?:%s(?:\.%s){0,3})' % (IPV4SEG, IPV4SEG)
 
 # IPv6 RegEx
-IPV6SEG = r'(?:[0-9a-fA-F]{1,4})'
+IPV6SEG = '(?:[0-9a-fA-F]{1,4})'
 IPV6GROUPS = (
-    r'::',
-    r'(?:%s:){1,7}:' % (IPV6SEG),
-    r':(?::%s){1,7}' % (IPV6SEG),
-    r'(?:%s:){1,6}:%s' % (IPV6SEG, IPV6SEG),
-    r'%s:(?::%s){1,6}' % (IPV6SEG, IPV6SEG),
-    r'(?:%s:){1,5}(?::%s){1,2}' % (IPV6SEG, IPV6SEG),
-    r'(?:%s:){1,4}(?::%s){1,3}' % (IPV6SEG, IPV6SEG),
-    r'(?:%s:){1,3}(?::%s){1,4}' % (IPV6SEG, IPV6SEG),
-    r'(?:%s:){1,2}(?::%s){1,5}' % (IPV6SEG, IPV6SEG),
-    r'(?:%s:){7,7}%s' % (IPV6SEG, IPV6SEG),
+    '::',
+    '(?:%s:){1,7}:' % (IPV6SEG),
+    ':(?::%s){1,7}' % (IPV6SEG),
+    '(?:%s:){1,6}:%s' % (IPV6SEG, IPV6SEG),
+    '%s:(?::%s){1,6}' % (IPV6SEG, IPV6SEG),
+    '(?:%s:){1,5}(?::%s){1,2}' % (IPV6SEG, IPV6SEG),
+    '(?:%s:){1,4}(?::%s){1,3}' % (IPV6SEG, IPV6SEG),
+    '(?:%s:){1,3}(?::%s){1,4}' % (IPV6SEG, IPV6SEG),
+    '(?:%s:){1,2}(?::%s){1,5}' % (IPV6SEG, IPV6SEG),
+    '(?:%s:){7,7}%s' % (IPV6SEG, IPV6SEG),
 )
-IPV6ADDR = '|'.join(['(?:%s)' % (g) for g in IPV6GROUPS[::-1]])
-IPV6ADDR = r'(?:%s)(?:%%\w+)?' % IPV6ADDR
+IPV6ADDR = '|'.join([f'(?:{group})' for group in IPV6GROUPS[::-1]])
+IPV6ADDR = f'(?:{IPV6ADDR})' r'(?:%\w+)?'
 
 # nu <netinet6/nd6.h>
 ND6_INFINITE_LIFETIME = 0xffffffff
@@ -73,16 +73,16 @@ def stderr(text):
 
 
 def error(text):
-    stderr('Error: %s' % text)
+    stderr(f'Error: {text}')
     exit(-1)
 
 
 def missarg(key):
-    error('argument "%s" is required' % key)
+    error(f'argument "{key}" is required')
 
 
 def invarg(msg, arg):
-    error('argument "%s" is wrong: %s' % (arg, msg))
+    error(f'argument "{arg}" is wrong: {msg}')
 
 
 def incomplete_command():
@@ -101,7 +101,6 @@ def read_family(name):
     for f, n in address_families:
         if name == n:
             return f
-
     return AF_UNSPEC
 
 
@@ -109,8 +108,74 @@ def family_name(family):
     for f, n in address_families:
         if family == f:
             return n
-
     return '???'
+
+
+def family_name_verbose(family):
+    if family == AF_UNSPEC:
+        return 'any value'
+    return family_name(family)
+
+
+def af_bit_len(af):
+    if af == AF_INET6:
+        return 128
+    elif af == AF_INET:
+        return 32
+    elif af == AF_MPLS:
+        return 20
+    else:
+        return 0
+
+
+def af_byte_len(af):
+    return int(af_bit_len(af) / 8)
+
+
+def mask2bits(mask):
+    return sum([bit_count(int(octet)) for octet in mask.split('.')])
+
+
+def get_addr(name, family):
+    if strcmp(name, 'default'):
+        if family == AF_MPLS:
+            error(f'{family_name_verbose(family)} address is expected rather than "{name}".')
+    elif strcmp(name, 'any', 'all'):
+        if family == AF_MPLS:
+            error(f'{family_name_verbose(family)} address is expected rather than "{name}".')
+        name = 'all'
+    elif family == AF_PACKET:
+        if not re.match(LLADDR, name):
+            error(f'"{name}" is invalid lladdr.')
+    elif re.match(IPV6ADDR, name):
+        family = AF_INET6
+    elif re.match(IPV4ADDR, name):
+        family = AF_INET
+    else:
+        error(f'{family_name_verbose(family)} address is expected rather than "{name}".')
+    return name, family
+
+
+def get_prefix(name, family):
+    if family == AF_PACKET:
+        error(f'"{name}" may be inet prefix, but it is not allowed in this context.')
+
+    dst, fml = get_addr(name.split('/')[0], family)
+    if fml != family:
+        error(f'{family_name_verbose(family)} prefix is expected rather than "{name}".')
+
+    if '/' in name:
+        bitlen = af_bit_len(fml)
+        mask = name.split('/')[1]
+        if mask.isdigit():
+            mask = int(mask)
+        elif re.match(IPV4ADDR, mask):
+            mask = mask2bits(mask)
+        if not isinstance(mask, int) or mask > bitlen:
+            error(f'{family_name_verbose(family)} prefix is expected rather than "{name}".')
+        name = f'{dst}/{mask}'
+
+    return name, fml
 
 
 def recurse_in(data, attr, val):
@@ -130,10 +195,10 @@ def recurse_in(data, attr, val):
     return False
 
 
-def delete_keys(data, attr):
-    for d in data:
-        for a in attr:
-            d.pop(a, None)
+def delete_keys(data, *args):
+    for entry in data:
+        for arg in args:
+            entry.pop(arg, None)
 
 
 # int.bit_count() only in Python >=3.10
@@ -152,8 +217,7 @@ def ref(obj_id):
 def json_dumps(data, pretty=False):
     if pretty:
         return json.dumps(data, cls=IpRouteJSON, indent=4)
-    else:
-        return json.dumps(data, separators=(',', ':'))
+    return json.dumps(data, separators=(',', ':'))
 
 
 def json_unindent_list(obj):

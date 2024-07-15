@@ -93,17 +93,17 @@ def iproute_list(argv, option):
     while argv:
         opt = argv.pop(0)
         if matches(opt, 'table'):
-            # table = next_arg(argv)
-            do_notimplemented()
+            table = next_arg(argv)
+            do_notimplemented([table])
         elif matches(opt, 'vrf'):
-            # tid = next_arg(argv)
-            do_notimplemented()
+            tid = next_arg(argv)
+            do_notimplemented([tid])
         elif matches(opt, 'cached', 'cloned'):
             do_notimplemented()
         elif (strcmp(opt, 'tod')
               or matches(opt, 'dsfield')):
-            # tos = next_arg(argv)
-            do_notimplemented()
+            tos = next_arg(argv)
+            do_notimplemented([tos])
         elif matches(opt, 'protocol'):
             protocol = next_arg(argv)
             if protocol not in ('static', 'redirect', 'kernel', 'all'):
@@ -114,13 +114,13 @@ def iproute_list(argv, option):
         elif matches(opt, 'scope'):
             scope = next_arg(argv)
             if (scope not in ('link', 'host', 'global', 'all')
-               and not scope.isnumeric()):
+               and not scope.isdigit()):
                 invarg('invalid "scope"', scope)
             if scope == 'all':
                 continue
             # FIXME: numeric scope?
             routes = [route for route in routes if 'scope' in route and route['scope'] == scope]
-            delete_keys(routes, ['scope'])
+            delete_keys(routes, 'scope')
         elif matches(opt, 'type'):
             addr_type = next_arg(argv)
             if addr_type not in ('blackhole', 'broadcast', 'multicast', 'unicast'):
@@ -130,10 +130,10 @@ def iproute_list(argv, option):
         elif strcmp(opt, 'dev', 'oif', 'iif'):
             dev = next_arg(argv)
             routes = [route for route in routes if 'dev' in route and route['dev'] == dev]
-            delete_keys(routes, ['dev'])
+            delete_keys(routes, 'dev')
         elif strcmp(opt, 'mark'):
-            # tid = next_arg(argv)
-            do_notimplemented()
+            mark = next_arg(argv)
+            do_notimplemented([mark])
         elif (matches(opt, 'metric', 'priority')
               or strcmp(opt, 'preference')):
             metric = next_arg(argv)
@@ -149,39 +149,46 @@ def iproute_list(argv, option):
                 family = option['preferred_family']
             else:
                 via = next_arg(argv)
-            do_notimplemented()
+            via, family = get_prefix(via, family)
+            routes = [route for route in routes if 'gateway' in route and route['gateway'] == via]
+            delete_keys(routes, 'gateway')
         elif strcmp(opt, 'src'):
-            # src = next_arg(argv)
-            do_notimplemented()
+            src = next_arg(argv)
+            do_notimplemented([src])
         elif matches(opt, 'realms'):
-            # realm = next_arg(argv)
-            do_notimplemented()
+            realm = next_arg(argv)
+            do_notimplemented([realm])
         elif matches(opt, 'from'):
             opt = next_arg(argv)
             if matches(opt, 'root'):
                 opt = next_arg(argv)
-                # get_prefix(opt, option['preferred_family'])
+                prefix, family = get_prefix(opt, option['preferred_family'])
+                do_notimplemented()
             elif matches(opt, 'match'):
                 opt = next_arg(argv)
-                # get_prefix(opt, option['preferred_family'])
+                prefix, family = get_prefix(opt, option['preferred_family'])
+                do_notimplemented()
             else:
                 if matches(opt, 'exact'):
                     opt = next_arg(argv)
-                # get_prefix(opt, option['preferred_family'])
+                prefix, family = get_prefix(opt, option['preferred_family'])
+                do_notimplemented()
         else:
             if matches(opt, 'to'):
                 opt = next_arg(argv)
             if matches(opt, 'root'):
                 opt = next_arg(argv)
-                # get_prefix(opt, option['preferred_family'])
+                prefix, family = get_prefix(opt, option['preferred_family'])
+                do_notimplemented()
             elif matches(opt, 'match'):
                 opt = next_arg(argv)
-                # get_prefix(opt, option['preferred_family'])
+                prefix, family = get_prefix(opt, option['preferred_family'])
+                do_notimplemented()
             else:
                 if matches(opt, 'exact'):
                     opt = next_arg(argv)
-                # get_prefix(opt, option['preferred_family'])
-            do_notimplemented()
+                prefix, family = get_prefix(opt, option['preferred_family'])
+                routes = [route for route in routes if 'dst' in route and route['dst'] == prefix]
 
     netstat.dumps(routes, option)
     return EXIT_SUCCESS
@@ -223,5 +230,5 @@ def do_iproute(argv, option):
     elif 'help'.startswith(cmd):
         return usage()
 
-    stderr('Command "%s" is unknown, try "ip route help".' % cmd)
+    stderr(f'Command "{cmd}" is unknown, try "ip route help".')
     exit(-1)

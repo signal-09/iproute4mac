@@ -34,7 +34,7 @@ def dumps(links, option):
                 stdout('    ', info['info_kind'], ' protocol ', data['protocol'], ' id ', data['id'], end='\n')
             elif info['info_kind'] == 'bridge':
                 data = info['info_data']
-                stdout('    bridge', ['%s %s' % (k, v) for k, v in data.items()], sep=' ', end='\n')
+                stdout('    bridge ', ' '.join([f'{k} {v}' for k, v in data.items()]), end='\n')
 
         for addr in link.get('addr_info', []):
             stdout('    ', addr['family'])

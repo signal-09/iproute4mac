@@ -217,7 +217,7 @@ pre-commit install
 You can checkout the compliance with the following command:
 
 ```shell
-pre-commit run --all-files --show-diff-on-failure
+pre-commit run --all-files [--show-diff-on-failure]
 ```
 
 ### Commit your work

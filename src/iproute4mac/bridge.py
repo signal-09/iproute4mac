@@ -41,7 +41,7 @@ def do_obj(argv, option):
         if o.startswith(obj):
             return f(argv, option)
 
-    stderr('Object "%s" is unknown, try "bridge help".' % obj)
+    stderr(f'Object "{obj}" is unknown, try "bridge help".')
     return EXIT_FAILURE
 
 
@@ -79,7 +79,7 @@ def main():
         if '-help'.startswith(opt):
             usage()
         elif '-Version'.startswith(opt):
-            print('bridge wrapper, iproute4mac-%s' % iproute4mac.VERSION)
+            print(f'bridge wrapper, iproute4mac-{iproute4mac.VERSION}')
             exit(0)
         elif '-stats'.startswith(opt) or '-statistics'.startswith(opt):
             option['show_stats'] = True
@@ -122,7 +122,7 @@ def main():
             except IndexError:
                 missarg('batch file')
         else:
-            stderr('Option "%s" is unknown, try "bridge help".' % opt)
+            stderr(f'Option "{opt}" is unknown, try "bridge help".')
             exit(-1)
 
     if batch_file:

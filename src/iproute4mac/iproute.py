@@ -83,7 +83,7 @@ def iproute_list(argv, option):
                          stderr=subprocess.PIPE,
                          encoding="utf-8")
     if cmd.returncode != 0:
-        print(cmd.stderr)
+        stderr(cmd.stderr)
         exit(cmd.returncode)
 
     if option['preferred_family'] == AF_UNSPEC:
@@ -149,8 +149,8 @@ def iproute_list(argv, option):
                 family = option['preferred_family']
             else:
                 via = next_arg(argv)
-            via, family = get_prefix(via, family)
-            routes = [route for route in routes if 'gateway' in route and route['gateway'] == via]
+            prefix = get_prefix(via, family)
+            routes = [route for route in routes if 'gateway' in route and prefix in Prefix(route['gateway'])]
             delete_keys(routes, 'gateway')
         elif strcmp(opt, 'src'):
             src = next_arg(argv)
@@ -162,33 +162,33 @@ def iproute_list(argv, option):
             opt = next_arg(argv)
             if matches(opt, 'root'):
                 opt = next_arg(argv)
-                prefix, family = get_prefix(opt, option['preferred_family'])
+                prefix = get_prefix(opt, option['preferred_family'])
                 do_notimplemented()
             elif matches(opt, 'match'):
                 opt = next_arg(argv)
-                prefix, family = get_prefix(opt, option['preferred_family'])
+                prefix = get_prefix(opt, option['preferred_family'])
                 do_notimplemented()
             else:
                 if matches(opt, 'exact'):
                     opt = next_arg(argv)
-                prefix, family = get_prefix(opt, option['preferred_family'])
+                prefix = get_prefix(opt, option['preferred_family'])
                 do_notimplemented()
         else:
             if matches(opt, 'to'):
                 opt = next_arg(argv)
             if matches(opt, 'root'):
                 opt = next_arg(argv)
-                prefix, family = get_prefix(opt, option['preferred_family'])
+                prefix = get_prefix(opt, option['preferred_family'])
                 do_notimplemented()
             elif matches(opt, 'match'):
                 opt = next_arg(argv)
-                prefix, family = get_prefix(opt, option['preferred_family'])
-                do_notimplemented()
+                prefix = get_prefix(opt, option['preferred_family'])
+                routes = [route for route in routes if 'dst' in route and prefix in Prefix(route['dst'])]
             else:
                 if matches(opt, 'exact'):
                     opt = next_arg(argv)
-                prefix, family = get_prefix(opt, option['preferred_family'])
-                routes = [route for route in routes if 'dst' in route and route['dst'] == prefix]
+                prefix = get_prefix(opt, option['preferred_family'])
+                routes = [route for route in routes if 'dst' in route and prefix == Prefix(route['dst'])]
 
     netstat.dumps(routes, option)
     return EXIT_SUCCESS

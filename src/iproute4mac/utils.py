@@ -1,6 +1,7 @@
 import json
 import re
 import sys
+import ipaddress
 
 from _ctypes import PyObj_FromPtr
 
@@ -13,7 +14,6 @@ AF_INET = 2
 AF_BRIDGE = 7
 AF_INET6 = 10
 AF_PACKET = 17    # not present in BSD
-AF_INET6 = 26
 AF_MPLS = 28
 
 address_families = [
@@ -42,6 +42,7 @@ LLADDR = '(?:%s(?::%s){5})' % (LLSEG, LLSEG)
 # IPv4 RegEx
 IPV4SEG = '(?:25[0-5]|2[0-4][0-9]|1{0,1}[0-9]{1,2})'
 IPV4ADDR = r'(?:%s(?:\.%s){0,3})' % (IPV4SEG, IPV4SEG)
+IPV4MASK = '(?:0x)?(?:[0-9a-fA-F]){8}'
 
 # IPv6 RegEx
 IPV6SEG = '(?:[0-9a-fA-F]{1,4})'
@@ -58,7 +59,7 @@ IPV6GROUPS = (
     '(?:%s:){7,7}%s' % (IPV6SEG, IPV6SEG),
 )
 IPV6ADDR = '|'.join([f'(?:{group})' for group in IPV6GROUPS[::-1]])
-IPV6ADDR = f'(?:{IPV6ADDR})' r'(?:%\w+)?'
+IPV6ADDR = f'(?:{IPV6ADDR})'
 
 # nu <netinet6/nd6.h>
 ND6_INFINITE_LIFETIME = 0xffffffff
@@ -137,45 +138,36 @@ def mask2bits(mask):
 
 
 def get_addr(name, family):
-    if strcmp(name, 'default'):
-        if family == AF_MPLS:
-            error(f'{family_name_verbose(family)} address is expected rather than "{name}".')
+    if family == AF_MPLS:
+        error('MPLS protocol not supported.')
+    elif strcmp(name, 'default'):
+        if family == AF_INET:
+            return Prefix('0.0.0.0/0')
+        if family == AF_INET6:
+            return Prefix('::/0')
     elif strcmp(name, 'any', 'all'):
-        if family == AF_MPLS:
-            error(f'{family_name_verbose(family)} address is expected rather than "{name}".')
-        name = 'all'
-    elif family == AF_PACKET:
-        if not re.match(LLADDR, name):
-            error(f'"{name}" is invalid lladdr.')
-    elif re.match(IPV6ADDR, name):
-        family = AF_INET6
-    elif re.match(IPV4ADDR, name):
-        family = AF_INET
+        if family == AF_INET:
+            return Prefix('0.0.0.0')
+        if family == AF_INET6:
+            return Prefix('::')
     else:
-        error(f'{family_name_verbose(family)} address is expected rather than "{name}".')
-    return name, family
+        prefix = Prefix(name)
+        if family == AF_PACKET or prefix.family == family:
+            return prefix
+
+    error(f'{family_name_verbose(family)} address is expected rather than "{name}".')
 
 
 def get_prefix(name, family):
     if family == AF_PACKET:
         error(f'"{name}" may be inet prefix, but it is not allowed in this context.')
 
-    dst, fml = get_addr(name.split('/')[0], family)
-    if fml != family:
+    try:
+        prefix = get_addr(name, family)
+    except ValueError:
         error(f'{family_name_verbose(family)} prefix is expected rather than "{name}".')
 
-    if '/' in name:
-        bitlen = af_bit_len(fml)
-        mask = name.split('/')[1]
-        if mask.isdigit():
-            mask = int(mask)
-        elif re.match(IPV4ADDR, mask):
-            mask = mask2bits(mask)
-        if not isinstance(mask, int) or mask > bitlen:
-            error(f'{family_name_verbose(family)} prefix is expected rather than "{name}".')
-        name = f'{dst}/{mask}'
-
-    return name, fml
+    return prefix
 
 
 def recurse_in(data, attr, val):
@@ -258,11 +250,97 @@ class IpRouteJSON(json.JSONEncoder):
         json_repr = super(IpRouteJSON, self).encode(obj)
         for match in self.regex.finditer(json_repr):
             id = int(match.group(1))
-            json_repr = json_repr.replace('"{}"'.format(format_spec.format(id)), repr(ref(id)))
-        json_repr = re.sub(r'\[\n\s+{', r'[ {', json_repr)
-        json_repr = re.sub(r'},\n\s+{', r'},{', json_repr)
-        json_repr = re.sub(r'}\n\s*\]', r'} ]', json_repr)
+            json_repr = json_repr.replace(f'"{format_spec.format(id)}"', repr(ref(id)))
+        json_repr = re.sub(r'\[\n\s+{', '[ {', json_repr)
+        json_repr = re.sub(r'},\n\s+{', '},{', json_repr)
+        json_repr = re.sub(r'}\n\s*\]', '} ]', json_repr)
         return json_repr
+
+
+class Prefix:
+    __slots__ = ('_prefix')
+
+    def __init__(self, prefix):
+        if prefix == 'default':
+            prefix = '0.0.0.0/0'
+        if '/' in prefix:
+            self._prefix = ipaddress.ip_network(prefix)
+        else:
+            self._prefix = ipaddress.ip_address(prefix)
+
+    def __eq__(self, other):
+        if self.version != other.version:
+            return False
+        if isinstance(type(self._prefix), type(other.prefix)):
+            return self._prefix == other.prefix
+        if self.is_host and other.is_host:
+            return self.address == other.address
+        return False
+
+    def __contains__(self, other):
+        if isinstance(self._prefix, ipaddress.IPv4Network | ipaddress.IPv6Network):
+            if other.is_host:
+                return other.address in self._prefix
+            else:
+                return other.prefix.subnet_of(self._prefix)
+        elif other.is_host:
+            return other.address == self._prefix
+        return False
+
+    def __repr__(self):
+        if (isinstance(self._prefix, ipaddress.IPv4Network | ipaddress.IPv6Network)
+                and self._prefix.network_address._ip + self._prefix.prefixlen == 0):
+            return 'default'
+        return str(self._prefix)
+
+    def __str__(self):
+        return str(self._prefx)
+
+    @property
+    def is_network(self):
+        return isinstance(self._prefix, ipaddress.IPv4Network | ipaddress.IPv6Network)
+
+    @property
+    def is_address(self):
+        return isinstance(self._prefix, ipaddress.IPv4Address | ipaddress.IPv6Address)
+
+    @property
+    def is_host(self):
+        return self.is_address or self._prefix._prefixlen == self._prefix._max_prefixlen
+
+    @property
+    def is_link(self):
+        return self._prefix.is_link_local
+
+    @property
+    def is_global(self):
+        return self._prefix.is_global
+
+    @property
+    def address(self):
+        if isinstance(self._prefix, ipaddress.IPv4Network | ipaddress.IPv6Network):
+            return self._prefix.network_address
+        else:
+            return self._prefix
+
+    @property
+    def prefix(self):
+        return self._prefix
+
+    @property
+    def prefixlen(self):
+        if isinstance(self._prefix, ipaddress.IPv4Network | ipaddress.IPv6Network):
+            return self._prefix.prefixlen
+        else:
+            return self._prefix._max_prefixlen
+
+    @property
+    def family(self):
+        return AF_INET if self._prefix._version == 4 else AF_INET6
+
+    @property
+    def version(self):
+        return self._prefix._version
 
 
 def strcmp(opt, *args):

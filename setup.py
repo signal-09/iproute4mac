@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.1.4'
+VERSION = '0.1.5'
 DESCRIPTION = 'iproute for Mac'
 with open('README.md', 'r') as f:
     LONG_DESCRIPTION = f.read()
@@ -27,7 +27,7 @@ setup(
         'Intended Audience :: System Administrators',
         'License :: OSI Approved :: Apache Software License',
         'Operating System :: MacOS :: MacOS X',
-        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3.10',
         'Topic :: System :: Networking',
     ],
     entry_points = {

@@ -34,7 +34,7 @@ def dumps(links, option):
                 stdout('    ', info['info_kind'], ' protocol ', data['protocol'], ' id ', data['id'], end='\n')
             elif info['info_kind'] == 'bridge':
                 data = info['info_data']
-                stdout('    bridge ', ' '.join([f'{k} {v}' for k, v in data.items()]), end='\n')
+                stdout('    bridge ', ' '.join([f'{key} {value}' for key, value in data.items()]), end='\n')
 
         for addr in link.get('addr_info', []):
             stdout('    ', addr['family'])
@@ -44,6 +44,8 @@ def dumps(links, option):
             stdout('/', addr['prefixlen'])
             if 'broadcast' in addr:
                 stdout(' brd ', addr['broadcast'])
+            if 'scope' in addr:
+                stdout(' scope ', addr['scope'])
             stdout(end='\n')
             if 'valid_life_time' in addr and 'preferred_life_time' in addr:
                 stdout('       valid_lft ',
@@ -59,18 +61,18 @@ class ifconfigRegEx:
                          r' mtu (?P<mtu>\d+)'
                          r' index (?P<ifindex>\d+)')
     _eflags = re.compile(r'\s+eflags=\w+<(?P<eflags>.*)>')
-    _ether = re.compile(r'\s+ether ((?:[0-9a-fA-F]{2}:?){6})')
-    _inet = re.compile(r'\s+inet (?P<local>\d+\.\d+\.\d+\.\d+)'
-                       r'(?: --> (?P<address>\d+\.\d+\.\d+\.\d+))?'
-                       r' netmask (?P<netmask>0x[0-9a-f]{8})'
-                       r'(?: broadcast (?P<broadcast>\d+\.\d+\.\d+\.\d+))?')
-    _inet6 = re.compile(r'\s+inet6 (?P<local>{})(?:%\w+)?'
+    _ether = re.compile(fr'\s+ether (?P<ether>{LLADDR})')
+    _inet = re.compile(fr'\s+inet (?P<local>{IPV4ADDR})'
+                       fr'(?: --> (?P<address>{IPV4ADDR}))?'
+                       fr' netmask (?P<netmask>{IPV4MASK})'
+                       fr'(?: broadcast (?P<broadcast>{IPV4ADDR}))?')
+    _inet6 = re.compile(fr'\s+inet6 (?P<local>{IPV6ADDR})(?:%\w+)?'
                         r' prefixlen (?P<prefixlen>\d+)'
                         r'(?: (?P<autoconf>autoconf))?'
                         r'(?: (?P<secured>secured))?'
                         r'(?: pltime (?P<pltime>\d+))?'
                         r'(?: vltime (?P<vltime>\d+))?'
-                        r'(?: scopeid (?P<scopeid>0x[0-9a-f]+))?'.format(IPV6ADDR))
+                        r'(?: scopeid (?P<scopeid>0x[0-9a-fA-F]+))?')
     _state = re.compile(r'\s+status: (?P<state>\w+)')
     _vlan = re.compile(r'\s+vlan: (?P<vlanid>\d+) parent interface: (?P<parent><?\w+>?)')
     _bond = re.compile(r'\s+bond interfaces: (\w+(?: \w+)*)')
@@ -181,7 +183,7 @@ def parse(res, option):
             link['eflags'] = match.eflags.group('eflags').split(',')
         elif match.ether:
             link['link_type'] = 'ether'
-            link['address'] = match.ether.group(1)
+            link['address'] = match.ether.group('ether')
             link['broadcast'] = 'ff:ff:ff:ff:ff:ff'
         elif match.state:
             link['operstate'] = oper_states[match.state.group('state')]
@@ -196,25 +198,44 @@ def parse(res, option):
             addr['prefixlen'] = netmask_to_length(inet['netmask'])
             if inet['broadcast']:
                 addr['broadcast'] = inet['broadcast']
+            ip = Prefix(addr['local'])
+            if ip.is_link:
+                addr['scope'] = 'link'
+            elif ip.is_global:
+                # FIXME: may be Python ipaddress is_global() not compliant with iproute2
+                addr['scope'] = 'global'
+            else:
+                addr['scope'] = 'host'
             addr.update({
                 'valid_life_time': ND6_INFINITE_LIFETIME,
                 'preferred_life_time': ND6_INFINITE_LIFETIME
             })
             if inet_count + inet6_count > 0:
+                # Let IPv4 at beginning
                 link['addr_info'].insert(inet_count, addr)
             else:
                 link['addr_info'] = [addr]
             inet_count += 1
         elif match.inet6 and option['preferred_family'] in (AF_INET6, AF_UNSPEC):
             inet6 = match.inet6.groupdict()
+            ip = Prefix(inet6['local'])
+            if ip.is_link:
+                scope = 'link'
+            elif ip.is_global:
+                # FIXME: may be Python ipaddress is_global() not compliant with iproute2
+                scope = 'global'
+            else:
+                scope = 'host'
             addr = {
                 'family': 'inet6',
                 'local': inet6['local'],
                 'prefixlen': int(inet6['prefixlen']),
+                'scope': scope,
                 'valid_life_time': int(inet6['vltime']) if inet6['vltime'] else ND6_INFINITE_LIFETIME,
                 'preferred_life_time': int(inet6['pltime']) if inet6['pltime'] else ND6_INFINITE_LIFETIME
             }
             if inet_count + inet6_count > 0:
+                # Put IPv6 after IPv4
                 link['addr_info'].append(addr)
             else:
                 link['addr_info'] = [addr]

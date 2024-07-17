@@ -59,9 +59,9 @@ def dumps(routes, option):
 class netstatRegEx:
     _ipv4 = re.compile(fr'(?P<dst>(?:default|{IPV4ADDR}))(?:/(?P<prefix>\d+))?'
                        fr'\s+(?P<gateway>{IPV4ADDR}|{LLADDR}|link#\d+)')
-    _ipv6 = re.compile(fr'(?P<dst>(?:default|{IPV6ADDR}))(?:/(?P<prefix>\d+))?'
+    _ipv6 = re.compile(fr'(?P<dst>(?:default|{IPV6ADDR}))(?:%\w+)?(?:/(?P<prefix>\d+))?'
                        fr'\s+(?P<gateway>{IPV6ADDR}|{LLADDR}|link#\d+)')
-    _route = re.compile(fr'(?P<dst>(?:default|{IPV4ADDR}|{IPV6ADDR}))(?:/(?P<prefix>\d+))?'
+    _route = re.compile(fr'(?P<dst>(?:default|{IPV4ADDR}|{IPV6ADDR}))(?:%\w+)?(?:/(?P<prefix>\d+))?'
                         fr'\s+(?P<gateway>{IPV4ADDR}|{IPV6ADDR}|{LLADDR}|link#\d+)'
                         r'\s+(?P<flags>\w+)'
                         r'\s+(?P<dev>\w+)'

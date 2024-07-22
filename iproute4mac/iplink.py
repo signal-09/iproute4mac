@@ -86,7 +86,7 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
 #         | netdevsim | rmnet | xfrm ]
 # ETYPE := [ TYPE | bridge_slave | bond_slave ]
 def iplink_list(argv, option):
-    option['preferred_family'] = AF_PACKET
+    option["preferred_family"] = AF_PACKET
     return ipaddr_list(argv, option, usage)
 
 
@@ -95,26 +95,23 @@ def do_iplink(argv, option):
         return iplink_list(argv, option)
 
     cmd = argv.pop(0)
-    if 'add'.startswith(cmd):
+    if "add".startswith(cmd):
         return do_notimplemented()
-    elif ('change'.startswith(cmd)
-          or 'set'.startswith(cmd)):
+    elif "change".startswith(cmd) or "set".startswith(cmd):
         return do_notimplemented()
-    elif 'replace'.startswith(cmd):
+    elif "replace".startswith(cmd):
         return do_notimplemented()
-    elif 'delete'.startswith(cmd):
+    elif "delete".startswith(cmd):
         return do_notimplemented()
-    elif ('show'.startswith(cmd)
-          or 'lst'.startswith(cmd)
-          or 'list'.startswith(cmd)):
+    elif "show".startswith(cmd) or "lst".startswith(cmd) or "list".startswith(cmd):
         return iplink_list(argv, option)
-    elif 'xstats'.startswith(cmd):
+    elif "xstats".startswith(cmd):
         return do_notimplemented()
-    elif 'afstats'.startswith(cmd):
+    elif "afstats".startswith(cmd):
         return do_notimplemented()
-    elif 'property'.startswith(cmd):
+    elif "property".startswith(cmd):
         return do_notimplemented()
-    elif 'help'.startswith(cmd):
+    elif "help".startswith(cmd):
         return usage()
 
     stderr(f'Command "{cmd}" is unknown, try "ip link help".')

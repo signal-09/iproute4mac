@@ -2,6 +2,7 @@ __pycache__/
 build/
 dist/
 venv/
+.tox/
 *.egg-info/
 _sharedmem.cpython*
 .ipynb_checkpoints/
@@ -10,4 +11,5 @@ Untitled*.ipynb
 *.o
 *.so
 .*.swp
+.*.swo
 .DS_Store

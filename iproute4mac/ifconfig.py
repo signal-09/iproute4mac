@@ -3,6 +3,10 @@ import re
 from iproute4mac.utils import *
 
 
+def exec(args=[]):
+    return shell(["ifconfig"] + args)
+
+
 def dumps(links, option):
     if option["json"]:
         print(json_dumps(links, option["pretty"]))

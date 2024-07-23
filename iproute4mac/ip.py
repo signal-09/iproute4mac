@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 
+import os
 import sys
-
 import iproute4mac
+
 from iproute4mac.utils import *
 from iproute4mac.iplink import do_iplink
 from iproute4mac.ipaddress import do_ipaddr
@@ -101,6 +102,7 @@ def main():
         "max_flush_loops": 10,
         "batch_mode": False,
         "do_all": False,
+        "uid": os.getuid(),
     }
 
     if sys.platform != "darwin":

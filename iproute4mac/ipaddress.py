@@ -1,4 +1,3 @@
-import subprocess
 import iproute4mac.ifconfig as ifconfig
 
 from iproute4mac.utils import *
@@ -61,17 +60,8 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
 #           vcan | veth | vlan | vrf | vti | vxcan | vxlan | wwan |
 #           xfrm }
 def ipaddr_list(argv, option, usage=usage):
-    cmd = subprocess.run(
-        ["ifconfig", "-v", "-L", "-a"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        encoding="utf-8",
-    )
-    if cmd.returncode != 0:
-        print(cmd.stderr)
-        exit(cmd.returncode)
-
-    links = ifconfig.parse(cmd.stdout, option=option)
+    stdout = ifconfig.exec(["-v", "-L", "-a"])
+    links = ifconfig.parse(stdout, option)
     while argv:
         opt = argv.pop(0)
         if strcmp(opt, "to"):

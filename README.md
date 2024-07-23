@@ -173,6 +173,19 @@ Implemented syntax:
 1. `iif` is not honored (is treated like `dev` and `oif`).
 2. *Route tables* are not implemented in macOS (Darwin).
 
+### `ip route get`: get a single route
+
+Implemented syntax:
+
+> ip route get ~~ROUTE_GET_FLAGS~~ ADDRESS [ ~~from ADDRESS iif STRING~~  ] [ ~~oif STRING~~ ] [ ~~mark MARK~~ ] [ ~~tos TOS~~ ] [ ~~vrf NAME~~ ] [ ~~ipproto PROTOCOL~~ ] [ ~~sport NUMBER~~ ] [ ~~dport NUMBER~~ ]
+> ROUTE_GET_FLAGS :=  [ fibmatch ]
+
+Shows the route to reach Google DNS 8.8.8.8:
+
+```shell
+ip route get 8.8.8.8
+```
+
 ## Contributing
 
 Every contribute is welcome!

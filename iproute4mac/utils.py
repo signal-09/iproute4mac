@@ -1,7 +1,9 @@
+import ipaddress
 import json
 import re
+import socket
+import subprocess
 import sys
-import ipaddress
 
 from _ctypes import PyObj_FromPtr
 
@@ -148,9 +150,9 @@ def get_addr(name, family):
         if family == AF_INET6:
             return Prefix("::")
     else:
-        prefix = Prefix(name)
-        if family == AF_PACKET or prefix.family == family:
-            return prefix
+        addr = Prefix(name)
+        if family in (AF_UNSPEC, AF_PACKET) or addr.family == family:
+            return addr
 
     error(f'{family_name_verbose(family)} address is expected rather than "{name}".')
 
@@ -165,6 +167,15 @@ def get_prefix(name, family):
         error(f'{family_name_verbose(family)} prefix is expected rather than "{name}".')
 
     return prefix
+
+
+def get_prefsrc(host, family):
+    family = socket.AF_INET6 if ":" in host or family == AF_INET6 else socket.AF_INET
+    sock = socket.socket(family, socket.SOCK_DGRAM)
+    sock.connect((host, 7))
+    src = sock.getsockname()[0]
+    sock.close()
+    return src
 
 
 def recurse_in(data, attr, val):
@@ -293,7 +304,11 @@ class Prefix:
         return str(self._prefix)
 
     def __str__(self):
-        return str(self._prefx)
+        return str(self._prefix)
+
+    @property
+    def _max_prefixlen(self):
+        return self._prefix._max_prefixlen
 
     @property
     def is_network(self):
@@ -360,3 +375,11 @@ def matches_color(opt):
 
 def do_notimplemented(argv=[], option={}):
     error("function not implemented")
+
+
+def shell(args):
+    cmd = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
+    if cmd.returncode != 0:
+        stderr(cmd.stderr)
+        exit(cmd.returncode)
+    return cmd.stdout

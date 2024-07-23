@@ -11,4 +11,5 @@ Untitled*.ipynb
 *.o
 *.so
 .*.swp
+.*.swo
 .DS_Store

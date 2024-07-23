@@ -1,5 +1,5 @@
-import subprocess
 import iproute4mac.netstat as netstat
+import iproute4mac.route as route
 
 from iproute4mac.utils import *
 
@@ -83,6 +83,101 @@ def iproute_modify(argv, option):
     return EXIT_SUCCESS
 
 
+def iproute_get(argv, option):
+    prefix = None
+
+    while argv:
+        opt = argv.pop(0)
+        if strcmp(opt, "tos") or matches(opt, "dsfield"):
+            tos = next_arg(argv)
+            do_notimplemented([tos])
+        elif matches(opt, "from"):
+            addr = next_arg(argv)
+            if matches(addr, "help"):
+                usage()
+            do_notimplemented([addr])
+        elif matches(opt, "iif"):
+            idev = next_arg(argv)
+            do_notimplemented([idev])
+        elif matches(opt, "mark"):
+            mark = next_arg(argv)
+            do_notimplemented([mark])
+        elif matches(opt, "oif"):
+            odev = next_arg(argv)
+            do_notimplemented([odev])
+        elif matches(opt, "oif"):
+            odev = next_arg(argv)
+            do_notimplemented([odev])
+        elif matches(opt, "notify"):
+            do_notimplemented()
+        elif matches(opt, "connected"):
+            do_notimplemented()
+        elif matches(opt, "vrf"):
+            odev = next_arg(argv)
+            do_notimplemented([odev])
+        elif matches(opt, "uid"):
+            uid = next_arg(argv)
+            try:
+                uid = int(uid)
+                assert 0 <= uid < 2**32
+            except (ValueError, AssertionError):
+                invarg("invalid UID", uid)
+            option["uid"] = uid
+        elif matches(opt, "fibmatch"):
+            do_notimplemented()
+        elif strcmp(opt, "as"):
+            addr = next_arg(argv)
+            if strcmp(addr, "to"):
+                addr = next_arg(argv)
+            addr = get_addr(addr, option["preferred_family"])
+            do_notimplemented()
+        elif matches(opt, "sport"):
+            sport = next_arg(argv)
+            try:
+                sport = int(sport)
+            except ValueError:
+                invarg("invalid sport", sport)
+            do_notimplemented([sport])
+        elif matches(opt, "dport"):
+            dport = next_arg(argv)
+            try:
+                dport = int(dport)
+            except ValueError:
+                invarg("invalid dport", dport)
+            do_notimplemented([dport])
+        elif matches(opt, "ipproto"):
+            ipproto = next_arg(argv)
+            try:
+                ipproto = int(ipproto)
+            except ValueError:
+                invarg('Invalid "ipproto" value', ipproto)
+            do_notimplemented([ipproto])
+        else:
+            if strcmp(opt, "to"):
+                opt = next_arg(argv)
+            if matches(opt, "help"):
+                usage()
+            prefix = get_prefix(opt, option["preferred_family"])
+            if not prefix.is_host:
+                stderr(
+                    f"Warning: /{prefix.prefixlen} as prefix is invalid, only /{prefix._max_prefixlen} (or none) is supported."
+                )
+                prefix = Prefix(str(prefix.address))
+
+    if not prefix:
+        stderr("need at least a destination address")
+        return EXIT_FAILURE
+
+    args = ["-n", "get"]
+    if prefix.version == 6 or option["preferred_family"] == AF_INET6:
+        args += ["-inet6"]
+
+    stdout = route.exec(args + [str(prefix)])
+    get = route.parse(stdout, option)
+    route.dumps(get, option)
+    return EXIT_SUCCESS
+
+
 # ip route [ list [ SELECTOR ] ]
 # SELECTOR := [ root PREFIX ] [ match PREFIX ] [ exact PREFIX ]
 #             [ table TABLE_ID ] [ vrf NAME ] [ proto RTPROTO ]
@@ -93,20 +188,11 @@ def iproute_modify(argv, option):
 # SCOPE := [ host | link | global | NUMBER ]
 # RTPROTO := [ kernel | boot | static | NUMBER ]
 def iproute_list(argv, option):
-    cmd = subprocess.run(
-        ["netstat", "-n", "-r"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        encoding="utf-8",
-    )
-    if cmd.returncode != 0:
-        stderr(cmd.stderr)
-        exit(cmd.returncode)
-
     if option["preferred_family"] == AF_UNSPEC:
         option["preferred_family"] = AF_INET
 
-    routes = netstat.parse(cmd.stdout, option)
+    stdout = netstat.exec(["-n", "-r"])
+    routes = netstat.parse(stdout, option)
     while argv:
         opt = argv.pop(0)
         if matches(opt, "table"):
@@ -233,7 +319,7 @@ def do_iproute(argv, option):
     elif "show".startswith(cmd) or "lst".startswith(cmd) or "list".startswith(cmd):
         return iproute_list(argv, option)
     elif "get".startswith(cmd):
-        return do_notimplemented()
+        return iproute_get(argv, option)
     elif "flush".startswith(cmd):
         return do_notimplemented()
     elif "save".startswith(cmd):

@@ -3,8 +3,8 @@ import re
 from iproute4mac.utils import *
 
 
-def exec(args=[]):
-    return shell(["ifconfig"] + args)
+def exec(*argv):
+    return shell("ifconfig", *argv)
 
 
 def dumps(links, option):
@@ -193,7 +193,7 @@ def parse(res, option):
             elif "POINTOPOINT" in link["flags"]:
                 link["link_pointtopoint"] = True
 
-            if link["ifname"].startswith("bridge") or link["ifname"].startswith("bond") or link["ifname"].startswith("vlan"):
+            if startwith(link["ifname"], "bridge", "bond", "vlan"):
                 link["linkinfo"] = {"info_kind": re.sub(r"[0-9]+", "", link["ifname"])}
 
             links.append(link)

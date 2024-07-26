@@ -95,23 +95,23 @@ def do_iplink(argv, option):
         return iplink_list(argv, option)
 
     cmd = argv.pop(0)
-    if "add".startswith(cmd):
+    if matches(cmd, "add"):
         return do_notimplemented()
-    elif "change".startswith(cmd) or "set".startswith(cmd):
+    elif matches(cmd, "change", "set"):
         return do_notimplemented()
-    elif "replace".startswith(cmd):
+    elif matches(cmd, "replace"):
         return do_notimplemented()
-    elif "delete".startswith(cmd):
+    elif matches(cmd, "delete"):
         return do_notimplemented()
-    elif "show".startswith(cmd) or "lst".startswith(cmd) or "list".startswith(cmd):
+    elif matches(cmd, "show", "lst", "list"):
         return iplink_list(argv, option)
-    elif "xstats".startswith(cmd):
+    elif matches(cmd, "xstats"):
         return do_notimplemented()
-    elif "afstats".startswith(cmd):
+    elif matches(cmd, "afstats"):
         return do_notimplemented()
-    elif "property".startswith(cmd):
+    elif matches(cmd, "property"):
         return do_notimplemented()
-    elif "help".startswith(cmd):
+    elif matches(cmd, "help"):
         return usage()
 
     stderr(f'Command "{cmd}" is unknown, try "ip link help".')

@@ -60,8 +60,8 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
 #           vcan | veth | vlan | vrf | vti | vxcan | vxlan | wwan |
 #           xfrm }
 def ipaddr_list(argv, option, usage=usage):
-    stdout = ifconfig.exec(["-v", "-L", "-a"])
-    links = ifconfig.parse(stdout, option)
+    res = ifconfig.exec("-v", "-L", "-a")
+    links = ifconfig.parse(res, option)
     while argv:
         opt = argv.pop(0)
         if strcmp(opt, "to"):
@@ -136,25 +136,25 @@ def do_ipaddr(argv, option):
         return ipaddr_list(argv, option)
 
     cmd = argv.pop(0)
-    if "add".startswith(cmd):
+    if matches(cmd, "add"):
         return do_notimplemented()
-    elif "change".startswith(cmd) or "chg".startswith(cmd):
+    elif matches(cmd, "change", "chg"):
         return do_notimplemented()
-    elif "replace".startswith(cmd):
+    elif matches(cmd, "replace"):
         return do_notimplemented()
-    elif "delete".startswith(cmd):
+    elif matches(cmd, "delete"):
         return do_notimplemented()
-    elif "show".startswith(cmd) or "lst".startswith(cmd) or "list".startswith(cmd):
+    elif matches(cmd, "show", "lst", "list"):
         return ipaddr_list(argv, option)
-    elif "flush".startswith(cmd):
+    elif matches(cmd, "flush"):
         return do_notimplemented()
-    elif "save".startswith(cmd):
+    elif matches(cmd, "save"):
         return do_notimplemented()
-    elif "showdump".startswith(cmd):
+    elif matches(cmd, "showdump"):
         return do_notimplemented()
-    elif "restore".startswith(cmd):
+    elif matches(cmd, "restore"):
         return do_notimplemented()
-    elif "help".startswith(cmd):
+    elif matches(cmd, "help"):
         return usage()
 
     stderr(f'Command "{cmd}" is unknown, try "ip address help".')

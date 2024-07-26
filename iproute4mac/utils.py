@@ -64,12 +64,14 @@ IPV6ADDR = f"(?:{IPV6ADDR})"
 ND6_INFINITE_LIFETIME = 0xFFFFFFFF
 
 
-def stdout(*args, sep="", end=""):
-    print(*args, sep=sep, end=end)
+def stdout(*argv, sep="", end=""):
+    print(*argv, sep=sep, end=end)
 
 
 def stderr(text):
-    sys.stderr.write(text + "\n")
+    if text[-1] != "\n":
+        text += "\n"
+    sys.stderr.write(text)
 
 
 def error(text):
@@ -144,11 +146,13 @@ def get_addr(name, family):
             return Prefix("0.0.0.0/0")
         if family == AF_INET6:
             return Prefix("::/0")
+        return Prefix("default")
     elif strcmp(name, "any", "all"):
         if family == AF_INET:
             return Prefix("0.0.0.0")
         if family == AF_INET6:
             return Prefix("::")
+        return Prefix("any")
     else:
         addr = Prefix(name)
         if family in (AF_UNSPEC, AF_PACKET) or addr.family == family:
@@ -195,9 +199,9 @@ def recurse_in(data, attr, val):
     return False
 
 
-def delete_keys(data, *args):
+def delete_keys(data, *argv):
     for entry in data:
-        for arg in args:
+        for arg in argv:
             entry.pop(arg, None)
 
 
@@ -266,18 +270,24 @@ class IpRouteJSON(json.JSONEncoder):
 
 
 class Prefix:
-    __slots__ = "_prefix"
+    __slots__ = ("_prefix", "_any")
 
     def __init__(self, prefix):
         if prefix == "default":
-            prefix = "0.0.0.0/0"
-        if "/" in prefix:
+            self._prefix = None
+            self._any = False
+        elif prefix == "any":
+            self._prefix = None
+            self._any = True
+        elif "/" in prefix:
             self._prefix = ipaddress.ip_network(prefix)
+            self._any = False
         else:
             self._prefix = ipaddress.ip_address(prefix)
+            self._any = False
 
     def __eq__(self, other):
-        if self.version != other.version:
+        if self.family != other.family:
             return False
         if isinstance(type(self._prefix), type(other.prefix)):
             return self._prefix == other.prefix
@@ -296,45 +306,73 @@ class Prefix:
         return False
 
     def __repr__(self):
-        if (
-            isinstance(self._prefix, ipaddress.IPv4Network | ipaddress.IPv6Network)
-            and self._prefix.network_address._ip + self._prefix.prefixlen == 0
-        ):
+        if self.is_default:
             return "default"
+        if self.is_any:
+            return "any"
         return str(self._prefix)
 
     def __str__(self):
-        return str(self._prefix)
+        if self._prefix:
+            return str(self._prefix)
+        if self.is_any:
+            return "any"
+        return "default"
 
     @property
     def _max_prefixlen(self):
         return self._prefix._max_prefixlen
 
     @property
-    def is_network(self):
+    def _is_default(self):
+        return not self._prefix and not self._any
+
+    @property
+    def _is_any(self):
+        return not self._prefix and self._any
+
+    @property
+    def _is_network(self):
         return isinstance(self._prefix, ipaddress.IPv4Network | ipaddress.IPv6Network)
 
     @property
-    def is_address(self):
+    def _is_address(self):
         return isinstance(self._prefix, ipaddress.IPv4Address | ipaddress.IPv6Address)
 
     @property
+    def is_default(self):
+        return self._is_default or (self._is_network and self._prefix.network_address._ip + self._prefix.prefixlen == 0)
+
+    @property
+    def is_any(self):
+        return self._is_any or (self._is_address and self._prefix._ip == 0)
+
+    @property
+    def is_network(self):
+        return self._is_network or self._is_default
+
+    @property
+    def is_address(self):
+        return self._is_address or self._is_any
+
+    @property
     def is_host(self):
-        return self.is_address or self._prefix._prefixlen == self._prefix._max_prefixlen
+        return self._is_address or (self._is_network and self._prefix._prefixlen == self._prefix._max_prefixlen)
 
     @property
     def is_link(self):
-        return self._prefix.is_link_local
+        return self._prefix and self._prefix.is_link_local
 
     @property
     def is_global(self):
-        return self._prefix.is_global
+        return self._is_default or (self._prefix and self._prefix.is_global)
 
     @property
     def address(self):
-        if isinstance(self._prefix, ipaddress.IPv4Network | ipaddress.IPv6Network):
+        if self._is_network:
             return self._prefix.network_address
         else:
+            # Return None in case of default/any
             return self._prefix
 
     @property
@@ -343,26 +381,63 @@ class Prefix:
 
     @property
     def prefixlen(self):
-        if isinstance(self._prefix, ipaddress.IPv4Network | ipaddress.IPv6Network):
+        if self._is_default:
+            return 0
+        if self._is_network:
             return self._prefix.prefixlen
-        else:
+        if self._is_address:
             return self._prefix._max_prefixlen
+        raise ValueError("Unknown prefix length")
 
     @property
     def family(self):
-        return AF_INET if self._prefix._version == 4 else AF_INET6
+        if not self._prefix:
+            return AF_UNSPEC
+        if self._prefix._version == 6:
+            return AF_INET6
+        return AF_INET
+
+    @family.setter
+    def family(self, value):
+        if value not in (AF_INET, AF_INET6):
+            raise ValueError(f"'{value!r}' does not appear to be a valid address family")
+        if self._prefix:
+            raise ValueError("Address family cannot be assigned to an already initialized prefix")
+        if self._is_default:
+            if value == AF_INET:
+                self._prefix = ipaddress.ip_network("0.0.0.0/0")
+            else:
+                self._prefix = ipaddress.ip_network("::/0")
+        elif self._is_any:
+            if value == AF_INET:
+                self._prefix = ipaddress.ip_address("0.0.0.0")
+            else:
+                self._prefix = ipaddress.ip_address("::")
+            self._any = False
 
     @property
     def version(self):
-        return self._prefix._version
+        return self._prefix._version if self._prefix else AF_UNSPEC
+
+    @version.setter
+    def version(self, value):
+        if value not in (4, 6):
+            raise ValueError(f"'{value!r}' does not appear to be a valid IP version protocol")
+        if self._prefix:
+            raise ValueError("IP version protocol cannot be assigned to an already initialized prefix")
+        self.family = AF_INET if value == 4 else AF_INET6
 
 
-def strcmp(opt, *args):
-    return any(arg == opt for arg in args)
+def strcmp(opt, *argv):
+    return any(arg == opt for arg in argv)
 
 
-def matches(opt, *args):
-    return any(arg.startswith(opt) for arg in args)
+def matches(opt, *argv):
+    return any(arg.startswith(opt) for arg in argv)
+
+
+def startwith(opt, *argv):
+    return any(opt.startswith(arg) for arg in argv)
 
 
 def matches_color(opt):
@@ -377,7 +452,20 @@ def do_notimplemented(argv=[], option={}):
     error("function not implemented")
 
 
-def shell(args):
+def flat_touple(*argv):
+    args = ()
+    for arg in argv:
+        if isinstance(arg, list):
+            args += tuple(arg)
+        elif isinstance(arg, tuple):
+            args += arg
+        else:
+            args += (arg,)
+    return args
+
+
+def shell(*argv):
+    args = flat_touple(*argv)
     cmd = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
     if cmd.returncode != 0:
         stderr(cmd.stderr)

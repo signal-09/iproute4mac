@@ -3,8 +3,58 @@ import re
 from iproute4mac.utils import *
 
 
-def exec(args=[]):
-    return shell(["route"] + args)
+ROUTE_DUMP_MAGIC = 0x45311224
+
+RTN_UNSPEC = 0
+RTN_UNICAST = 1
+RTN_LOCAL = 2
+RTN_BROADCAST = 3
+RTN_ANYCAST = 4
+RTN_MULTICAST = 5
+RTN_BLACKHOLE = 6
+RTN_UNREACHABLE = 7
+RTN_PROHIBIT = 8
+RTN_THROW = 9
+RTN_NAT = 10
+RTN_XRESOLVE = 11
+__RTN_MAX = 12
+
+RTN_MAP = (
+    "none",
+    "unicast",
+    "local",
+    "broadcast",
+    "anycast",
+    "multicast",
+    "blackhole",
+    "unreachable",
+    "prohibit",
+    "throw",
+    "nat",
+    "xresolve",
+)
+
+
+def get_rtn(name):
+    if name.isdigit():
+        rtn = int(name)
+    else:
+        rtn = RTN_MAP.index(name)
+    if not 0 < rtn < 2**8:
+        raise ValueError
+    return rtn
+
+
+def is_rtn(name):
+    try:
+        get_rtn(name)
+    except ValueError:
+        return False
+    return True
+
+
+def exec(*argv):
+    return shell("route", *argv)
 
 
 def dumps(routes, option):

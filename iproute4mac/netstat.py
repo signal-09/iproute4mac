@@ -31,8 +31,8 @@ RTF_PROXY = "Y"  # Proxying; cloned routes will not be scoped
 RTF_GLOBAL = "g"  # Route to a destination of the global internet (policy hint)
 
 
-def exec(args=[]):
-    return shell(["netstat"] + args)
+def exec(*argv):
+    return shell("netstat", *argv)
 
 
 def dumps(routes, option):

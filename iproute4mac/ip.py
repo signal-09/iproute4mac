@@ -103,6 +103,7 @@ def main():
         "batch_mode": False,
         "do_all": False,
         "uid": os.getuid(),
+        "verbose": 0,
     }
 
     if sys.platform != "darwin":
@@ -121,67 +122,67 @@ def main():
         if opt[1] == "-":
             opt = opt[1:]
 
-        if "-loops".startswith(opt):
+        if matches(opt, "-loops"):
             try:
                 option["max_flush_loops"] = int(argv.pop(0))
             except IndexError:
                 missarg("loop count")
             except ValueError:
                 error("loop count not a number")
-        elif "-family".startswith(opt):
+        elif matches(opt, "-family"):
             try:
                 opt = argv.pop(0)
             except IndexError:
                 missarg("family type")
-            if opt == "help":
+            if strcmp(opt, "help"):
                 usage()
             option["preferred_family"] = read_family(opt)
             if option["preferred_family"] == AF_UNSPEC:
                 invarg("invalid protocol family", opt)
-        elif opt == "-4":
+        elif strcmp(opt, "-4"):
             option["preferred_family"] = AF_INET
-        elif opt == "-6":
+        elif strcmp(opt, "-6"):
             option["preferred_family"] = AF_INET6
-        elif opt == "-0":
+        elif strcmp(opt, "-0"):
             option["preferred_family"] = AF_PACKET
-        elif opt == "-M":
+        elif strcmp(opt, "-M"):
             option["preferred_family"] = AF_MPLS
-        elif opt == "-B":
+        elif strcmp(opt, "-B"):
             option["preferred_family"] = AF_BRIDGE
-        elif "-human-readable".startswith(opt):
+        elif matches(opt, "-human-readable"):
             option["human_readable"] = True
-        elif "-iec".startswith(opt):
+        elif matches(opt, "-iec"):
             option["use_iec"] = True
-        elif "-stats".startswith(opt) or "-statistics".startswith(opt):
+        elif matches(opt, "-stats", "-statistics"):
             option["show_stats"] = True
-        elif "-details".startswith(opt):
+        elif matches(opt, "-details"):
             option["show_details"] = True
-        elif "-resolve".startswith(opt):
+        elif matches(opt, "-resolve"):
             option["resolve_hosts"] = True
-        elif "-oneline".startswith(opt):
+        elif matches(opt, "-oneline"):
             option["oneline"] = True
-        elif "-timestamp".startswith(opt):
+        elif matches(opt, "-timestamp"):
             option["timestamp"] = True
-        elif "-tshort".startswith(opt):
+        elif matches(opt, "-tshort"):
             option["timestamp"] = True
             option["timestamp_short"] = True
-        elif "-Version".startswith(opt):
+        elif matches(opt, "-Version"):
             print(f"ip wrapper, iproute4mac-{iproute4mac.VERSION}")
             exit(0)
-        elif "-force".startswith(opt):
+        elif matches(opt, "-force"):
             option["force"] = True
-        elif "-batch".startswith(opt):
+        elif matches(opt, "-batch"):
             try:
                 batch_file = argv.pop(0)
             except IndexError:
                 missarg("batch file")
-        elif "-brief".startswith(opt):
+        elif matches(opt, "-brief"):
             option["brief"] = True
-        elif "-json".startswith(opt):
+        elif matches(opt, "-json"):
             option["json"] = True
-        elif "-pretty".startswith(opt):
+        elif matches(opt, "-pretty"):
             option["pretty"] = True
-        elif "-rcvbuf".startswith(opt):
+        elif matches(opt, "-rcvbuf"):
             try:
                 option["rcvbuf"] = int(argv.pop(0))
             except IndexError:
@@ -191,16 +192,18 @@ def main():
         elif matches_color(opt):
             # Color option is not implemented
             pass
-        elif "-help".startswith(opt):
+        elif matches(opt, "-help"):
             usage()
-        elif "-netns".startswith(opt):
+        elif matches(opt, "-netns"):
             do_notimplemented()
-        elif "-Numeric".startswith(opt):
+        elif matches(opt, "-Numeric"):
             option["numeric"] = True
-        elif "-all".startswith(opt):
+        elif matches(opt, "-all"):
             option["do_all"] = True
-        elif opt == "-echo":
+        elif strcmp(opt, "-echo"):
             option["echo_request"] = True
+        elif strcmp(opt, "-verbose"):
+            option["verbose"] += 1
         else:
             stderr(f'Option "{opt}" is unknown, try "ip -help".')
             exit(-1)

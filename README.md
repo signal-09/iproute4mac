@@ -1,12 +1,14 @@
 # iproute4mac
 
 [![GH Actions CI](https://github.com/signal-09/iproute4mac/actions/workflows/python-package.yml/badge.svg?branch=master)](https://github.com/signal-09/iproute4mac/actions/workflows/python-package.yml)
+[![PyPI Downloads](https://img.shields.io/pypi/dm/iproute4mac)](https://pypi.org/project/iproute4mac/)
 
 This is a macOS network wrapper to imitate GNU/Linux [iproute2](https://wiki.linuxfoundation.org/networking/iproute2) suite, inspired by the [iproute2mac](https://github.com/brona/iproute2mac) project.
 
-> **WARNING:** early Aplha stage
->
-> Read only `ip link [show]`, `ip address [show]`, and `ip route [show]` objects implemented for now.
+### Working staff
+
+* `ip link [ show ]`, `ip address [ show ]`, and `ip route [ show ]`
+* `ip route { add | change | replace | delete }`
 
 ## Installation
 

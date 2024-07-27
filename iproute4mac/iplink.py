@@ -95,14 +95,8 @@ def do_iplink(argv, option):
         return iplink_list(argv, option)
 
     cmd = argv.pop(0)
-    if matches(cmd, "add"):
-        return do_notimplemented()
-    elif matches(cmd, "change", "set"):
-        return do_notimplemented()
-    elif matches(cmd, "replace"):
-        return do_notimplemented()
-    elif matches(cmd, "delete"):
-        return do_notimplemented()
+    if matches(cmd, "add", "change", "set", "replace", "delete"):
+        return iplink_modify(argv, option)
     elif matches(cmd, "show", "lst", "list"):
         return iplink_list(argv, option)
     elif matches(cmd, "xstats"):

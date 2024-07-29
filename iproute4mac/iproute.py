@@ -86,19 +86,19 @@ def iproute_change(argv):
     route.exec("change", argv)
 
 
-def iproute_modify(cmd, argv, option):
+def iproute_modify(cmd, argv):
     entry = {}
     modifiers = {}
     while argv:
         opt = argv.pop(0)
         if strcmp(opt, "src"):
-            addr = get_addr(next_arg(argv), option["preferred_family"])
+            addr = get_addr(next_arg(argv), OPTION["preferred_family"])
             do_notimplemented([addr])
         elif strcmp(opt, "as"):
             addr = next_arg(argv)
             if strcmp(addr, "to"):
                 addr = next_arg(argv)
-            addr = get_addr(addr, option["preferred_family"])
+            addr = get_addr(addr, OPTION["preferred_family"])
             do_notimplemented([addr])
         elif strcmp(opt, "via"):
             if "gateway" in entry:
@@ -106,12 +106,12 @@ def iproute_modify(cmd, argv, option):
             addr = argv.pop(0)
             family = read_family(addr)
             if family == AF_UNSPEC:
-                family = option["preferred_family"]
+                family = OPTION["preferred_family"]
             else:
                 addr = next_arg(argv)
             entry["gateway"] = get_addr(addr, family)
         elif strcmp(opt, "from"):
-            addr = get_addr(next_arg(argv), option["preferred_family"])
+            addr = get_addr(next_arg(argv), OPTION["preferred_family"])
             do_notimplemented([addr])
         elif strcmp(opt, "tos") or matches(opt, "dsfield"):
             tos = next_arg(argv)
@@ -321,7 +321,7 @@ def iproute_modify(cmd, argv, option):
                 opt = next_arg(argv)
             if matches(opt, "help"):
                 usage()
-            entry["dst"] = get_prefix(opt, option["preferred_family"])
+            entry["dst"] = get_prefix(opt, OPTION["preferred_family"])
 
     if "dst" not in entry:
         usage()
@@ -360,7 +360,7 @@ def iproute_modify(cmd, argv, option):
     return EXIT_SUCCESS
 
 
-def iproute_get(argv, option):
+def iproute_get(argv):
     prefix = None
 
     while argv:
@@ -399,14 +399,14 @@ def iproute_get(argv, option):
                 assert 0 <= uid < 2**32
             except (ValueError, AssertionError):
                 invarg("invalid UID", uid)
-            option["uid"] = uid
+            OPTION["uid"] = uid
         elif matches(opt, "fibmatch"):
             do_notimplemented()
         elif strcmp(opt, "as"):
             addr = next_arg(argv)
             if strcmp(addr, "to"):
                 addr = next_arg(argv)
-            addr = get_addr(addr, option["preferred_family"])
+            addr = get_addr(addr, OPTION["preferred_family"])
             do_notimplemented()
         elif matches(opt, "sport"):
             sport = next_arg(argv)
@@ -434,7 +434,7 @@ def iproute_get(argv, option):
                 opt = next_arg(argv)
             if matches(opt, "help"):
                 usage()
-            prefix = get_prefix(opt, option["preferred_family"])
+            prefix = get_prefix(opt, OPTION["preferred_family"])
             if not prefix.is_host:
                 stderr(
                     f"Warning: /{prefix.prefixlen} as prefix is invalid, only /{prefix._max_prefixlen} (or none) is supported."
@@ -446,12 +446,12 @@ def iproute_get(argv, option):
         return EXIT_FAILURE
 
     argv = ["-n", "get"]
-    if prefix.family == AF_INET6 or option["preferred_family"] == AF_INET6:
+    if prefix.family == AF_INET6 or OPTION["preferred_family"] == AF_INET6:
         argv += ["-inet6"]
 
     res = route.exec(argv, str(prefix))
-    get = route.parse(res, option)
-    route.dumps(get, option)
+    get = route.parse(res)
+    route.dumps(get)
 
     return EXIT_SUCCESS
 
@@ -465,12 +465,12 @@ def iproute_get(argv, option):
 # TABLE_ID := [ local | main | default | all | NUMBER ]
 # SCOPE := [ host | link | global | NUMBER ]
 # RTPROTO := [ kernel | boot | static | NUMBER ]
-def iproute_list(argv, option):
-    if option["preferred_family"] == AF_UNSPEC:
-        option["preferred_family"] = AF_INET
+def iproute_list(argv):
+    if OPTION["preferred_family"] == AF_UNSPEC:
+        OPTION["preferred_family"] = AF_INET
 
     res = netstat.exec("-n", "-r")
-    entries = netstat.parse(res, option)
+    entries = netstat.parse(res)
     while argv:
         opt = argv.pop(0)
         if matches(opt, "table"):
@@ -527,7 +527,7 @@ def iproute_list(argv, option):
             via = next_arg(argv)
             family = read_family(via)
             if family == AF_UNSPEC:
-                family = option["preferred_family"]
+                family = OPTION["preferred_family"]
             else:
                 via = next_arg(argv)
             prefix = get_prefix(via, family)
@@ -543,52 +543,52 @@ def iproute_list(argv, option):
             opt = next_arg(argv)
             if matches(opt, "root"):
                 opt = next_arg(argv)
-                prefix = get_prefix(opt, option["preferred_family"])
+                prefix = get_prefix(opt, OPTION["preferred_family"])
                 do_notimplemented()
             elif matches(opt, "match"):
                 opt = next_arg(argv)
-                prefix = get_prefix(opt, option["preferred_family"])
+                prefix = get_prefix(opt, OPTION["preferred_family"])
                 do_notimplemented()
             else:
                 if matches(opt, "exact"):
                     opt = next_arg(argv)
-                prefix = get_prefix(opt, option["preferred_family"])
+                prefix = get_prefix(opt, OPTION["preferred_family"])
                 do_notimplemented()
         else:
             if matches(opt, "to"):
                 opt = next_arg(argv)
             if matches(opt, "root"):
                 opt = next_arg(argv)
-                prefix = get_prefix(opt, option["preferred_family"])
+                prefix = get_prefix(opt, OPTION["preferred_family"])
                 do_notimplemented()
             elif matches(opt, "match"):
                 opt = next_arg(argv)
-                prefix = get_prefix(opt, option["preferred_family"])
+                prefix = get_prefix(opt, OPTION["preferred_family"])
                 entries = [entry for entry in entries if "dst" in entry and prefix in Prefix(entry["dst"])]
             else:
                 if matches(opt, "exact"):
                     opt = next_arg(argv)
-                prefix = get_prefix(opt, option["preferred_family"])
+                prefix = get_prefix(opt, OPTION["preferred_family"])
                 entries = [entry for entry in entries if "dst" in entry and prefix == Prefix(entry["dst"])]
 
-    netstat.dumps(entries, option)
+    netstat.dumps(entries)
 
     return EXIT_SUCCESS
 
 
-def do_iproute(argv, option):
+def do_iproute(argv):
     if not argv:
-        return iproute_list(argv, option)
+        return iproute_list(argv)
 
     cmd = argv.pop(0)
     if matches(cmd, "add", "change", "replace", "prepend", "append", "delete"):
-        return iproute_modify(cmd, argv, option)
+        return iproute_modify(cmd, argv)
     elif matches(cmd, "test"):
         return do_notimplemented()
     elif matches(cmd, "show", "lst", "list"):
-        return iproute_list(argv, option)
+        return iproute_list(argv)
     elif matches(cmd, "get"):
-        return iproute_get(argv, option)
+        return iproute_get(argv)
     elif matches(cmd, "flush"):
         return do_notimplemented()
     elif matches(cmd, "save"):

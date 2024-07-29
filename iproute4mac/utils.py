@@ -1,5 +1,6 @@
 import ipaddress
 import json
+import os
 import re
 import socket
 import subprocess
@@ -9,6 +10,12 @@ from _ctypes import PyObj_FromPtr
 
 
 """ Costants """
+LOG_ERROR = 0
+LOG_WARN = 1
+LOG_INFO = 2
+LOG_DEBUG = 3
+LOG_LABEL = ("Error", "Warning", "Info", "Debug")
+
 # socket.h
 AF_UNSPEC = 0
 AF_UNIX = 1
@@ -64,19 +71,57 @@ IPV6ADDR = f"(?:{IPV6ADDR})"
 ND6_INFINITE_LIFETIME = 0xFFFFFFFF
 
 
+""" Global options """
+OPTION = {
+    "preferred_family": AF_UNSPEC,
+    "human_readable": False,
+    "use_iec": False,
+    "show_stats": False,
+    "show_details": False,
+    "oneline": False,
+    "brief": False,
+    "json": False,
+    "pretty": False,
+    "timestamp": False,
+    "timestamp_short": False,
+    "echo_request": False,
+    "force": False,
+    "max_flush_loops": 10,
+    "batch_mode": False,
+    "do_all": False,
+    "uid": os.getuid(),
+    "compress_vlans": False,
+    "verbose": 0,
+}
+
+
 def stdout(*argv, sep="", end=""):
     print(*argv, sep=sep, end=end)
 
 
-def stderr(text):
+def stderr(text, log_level=LOG_ERROR):
+    if OPTION["verbose"] < log_level:
+        return
     if text[-1] != "\n":
         text += "\n"
-    sys.stderr.write(text)
+    sys.stderr.write(LOG_LABEL[log_level] + ": " + text)
 
 
 def error(text):
-    stderr(f"Error: {text}")
+    stderr(text)
     exit(-1)
+
+
+def warn(text):
+    stderr(text, log_level=LOG_WARN)
+
+
+def info(text):
+    stderr(text, log_level=LOG_INFO)
+
+
+def debug(text):
+    stderr(text, log_level=LOG_DEBUG)
 
 
 def missarg(key):
@@ -448,7 +493,7 @@ def matches_color(opt):
     return "-color".startswith(opt) and arg in ["always", "auto", "never"]
 
 
-def do_notimplemented(argv=[], option={}):
+def do_notimplemented(argv=[]):
     error("function not implemented")
 
 

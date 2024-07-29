@@ -7,9 +7,9 @@ def exec(*argv):
     return shell("ifconfig", *argv)
 
 
-def dumps(links, option):
-    if option["json"]:
-        print(json_dumps(links, option["pretty"]))
+def dumps(links):
+    if OPTION["json"]:
+        print(json_dumps(links, OPTION["pretty"]))
         return
 
     if not links:
@@ -167,9 +167,11 @@ def parse_bridge(lines, links, link):
         elif match.cache:
             link["linkinfo"].update({"info_data": info_data})
             break
+        elif line:
+            debug(f'Unparsed line "{line.strip()}"')
 
 
-def parse(res, option):
+def parse(res):
     links = []
     lines = iter(res.split("\n"))
     while line := next(lines):
@@ -177,6 +179,7 @@ def parse(res, option):
 
         if match.header:
             header = match.header.groupdict()
+            debug(f"Found interface {header}")
             link = {
                 "ifindex": int(header["ifindex"]),
                 "ifname": header["ifname"],
@@ -209,7 +212,7 @@ def parse(res, option):
             link["broadcast"] = "ff:ff:ff:ff:ff:ff"
         elif match.state:
             link["operstate"] = oper_states[match.state.group("state")]
-        elif match.inet and option["preferred_family"] in (AF_INET, AF_UNSPEC):
+        elif match.inet and OPTION["preferred_family"] in (AF_INET, AF_UNSPEC):
             inet = match.inet.groupdict()
             addr = {"family": "inet", "local": inet["local"]}
             if inet["address"]:
@@ -237,7 +240,7 @@ def parse(res, option):
             else:
                 link["addr_info"] = [addr]
             inet_count += 1
-        elif match.inet6 and option["preferred_family"] in (AF_INET6, AF_UNSPEC):
+        elif match.inet6 and OPTION["preferred_family"] in (AF_INET6, AF_UNSPEC):
             inet6 = match.inet6.groupdict()
             ip = Prefix(inet6["local"])
             if ip.is_link:
@@ -285,5 +288,7 @@ def parse(res, option):
                 }
         elif match.bridge:
             parse_bridge(lines, links, link)
+        elif line:
+            debug(f'Unparsed line "{line.strip()}"')
 
     return links

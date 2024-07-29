@@ -35,16 +35,16 @@ def exec(*argv):
     return shell("netstat", *argv)
 
 
-def dumps(routes, option):
-    if option["json"]:
-        print(json_dumps(routes, option["pretty"]))
+def dumps(routes):
+    if OPTION["json"]:
+        print(json_dumps(routes, OPTION["pretty"]))
         return
 
     if not routes:
         return
 
     for route in routes:
-        if option["show_details"] or "type" in route:
+        if OPTION["show_details"] or "type" in route:
             stdout(route["type"] if "type" in route else "unicast", " ")
         stdout(route["dst"])
         if "gateway" in route:
@@ -61,91 +61,100 @@ def dumps(routes, option):
 
 
 class netstatRegEx:
-    _ipv4 = re.compile(
-        rf"(?P<dst>(?:default|{IPV4ADDR}))(?:/(?P<prefix>\d+))?" rf"\s+(?P<gateway>{IPV4ADDR}|{LLADDR}|link#\d+)"
-    )
-    _ipv6 = re.compile(
-        rf"(?P<dst>(?:default|{IPV6ADDR}))(?:%\w+)?(?:/(?P<prefix>\d+))?" rf"\s+(?P<gateway>{IPV6ADDR}|{LLADDR}|link#\d+)"
-    )
     _route = re.compile(
         rf"(?P<dst>(?:default|{IPV4ADDR}|{IPV6ADDR}))(?:%\w+)?(?:/(?P<prefix>\d+))?"
-        rf"\s+(?P<gateway>{IPV4ADDR}|{IPV6ADDR}|{LLADDR}|link#\d+)"
+        rf"\s+(?P<gateway>{IPV4ADDR}|{IPV6ADDR}|{LLADDR}|link#\d+)(?:%\w+)?"
         r"\s+(?P<flags>\w+)"
         r"\s+(?P<dev>\w+)"
         r"\s+(?P<expire>\S+)?"
     )
 
     def __init__(self, line):
-        self.ipv4 = self._ipv4.match(line)
-        self.ipv6 = self._ipv6.match(line)
         self.route = self._route.match(line)
 
 
-def parse(res, option):
+def parse(res):
     routes = []
     for line in iter(res.split("\n")):
         match = netstatRegEx(line)
 
         if match.route:
-            dst, prefix, gateway, flags, dev, expire = match.route.groups()
+            route = match.route.groupdict()
+            debug(f"Found route {route}")
 
-            if any(flag in flags for flag in (RTF_WASCLONED, RTF_PROXY)):
-                continue
-            if match.ipv4 and option["preferred_family"] == AF_INET6:
-                continue
-            if match.ipv6 and option["preferred_family"] == AF_INET:
+            if route["flags"] == RTF_WASCLONED or route["flags"] == RTF_PROXY:
+                debug("Skip cloned/proxy rotue")
                 continue
 
-            if dst != "default" and match.ipv4:
-                dots = dst.count(".")
+            if re.search(LLADDR, route["gateway"]):
+                if not OPTION["show_details"]:
+                    debug("Skip host rotue")
+                    continue
+                del route["gateway"]
+
+            if re.match(IPV4ADDR, route["dst"]) or ("gateway" in route and re.match(IPV4ADDR, route["gateway"])):
+                family = AF_INET
+            else:
+                family = AF_INET6
+            if family == AF_INET and OPTION["preferred_family"] == AF_INET6:
+                debug("Skip IPv4 rotue")
+                continue
+            if family == AF_INET6 and OPTION["preferred_family"] == AF_INET:
+                debug("Skip IPv6 rotue")
+                continue
+
+            if route["dst"] != "default" and family == AF_INET:
+                dots = route["dst"].count(".")
                 if dots < 3:
-                    dst = dst + ".0" * (3 - dots)
-                    if not prefix:
-                        prefix = 8 * (dots + 1)
-            if prefix:
-                dst = f"{dst}/{prefix}"
+                    route["dst"] = route["dst"] + ".0" * (3 - dots)
+                    if not route["prefix"]:
+                        route["prefix"] = 8 * (dots + 1)
+            if route["prefix"]:
+                route["dst"] = f"{route["dst"]}/{route["prefix"]}"
 
             # protocol
-            if RTF_STATIC in flags:
+            if RTF_STATIC in route["flags"]:
                 protocol = "static"
-            elif any(flag in flags for flag in (RTF_DYNAMIC, RTF_MODIFIED)):
+            elif any(flag in route["flags"] for flag in (RTF_DYNAMIC, RTF_MODIFIED)):
                 protocol = "redirect"
             else:
                 protocol = "kernel"
 
             # scope
-            if gateway.startswith("link#") or re.search(LLADDR, gateway):
-                scope = "link"
-                gateway = None
-            elif RTF_HOST in flags:
+            if RTF_HOST in route["flags"]:
                 scope = "host"
-            elif option["show_details"]:
+            if "gateway" in route and route["gateway"].startswith("link#"):
+                scope = "link"
+                del route["gateway"]
+            elif OPTION["show_details"]:
                 scope = "global"
             else:
                 scope = None
 
             # address type
-            if RTF_BLACKHOLE in flags:
+            if RTF_BLACKHOLE in route["flags"]:
                 addr_type = "blackhole"
-            elif RTF_BROADCAST in flags:
+            elif RTF_BROADCAST in route["flags"]:
                 addr_type = "broadcast"
-            elif RTF_MULTICAST in flags:
+            elif RTF_MULTICAST in route["flags"]:
                 addr_type = "multicast"
-            elif option["show_details"]:
+            elif OPTION["show_details"]:
                 addr_type = "unicast"
             else:
                 addr_type = None
 
             route = {
                 "type": addr_type,
-                "dst": dst,
-                "gateway": gateway,
-                "dev": dev,
+                "dst": route["dst"],
+                "gateway": route["gateway"] if "gateway" in route else None,
+                "dev": route["dev"],
                 "protocol": protocol,
                 "scope": scope,
-                "expire": int(expire) if expire and expire != "!" else None,
+                "expire": int(route["expire"]) if route["expire"] and route["expire"] != "!" else None,
                 "flags": [],
             }
             routes.append({k: v for k, v in route.items() if v is not None})
+        elif line:
+            debug(f'Unparsed line "{line.strip()}"')
 
     return routes

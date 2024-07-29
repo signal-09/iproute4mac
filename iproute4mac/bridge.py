@@ -8,7 +8,7 @@ from iproute4mac.iplink import *
 from iproute4mac.ipaddress import *
 
 
-def do_help(argv=[], option={}):
+def do_help(argv=[]):
     usage()
 
 
@@ -35,11 +35,11 @@ objs = [
 ]
 
 
-def do_obj(argv, option):
+def do_obj(argv):
     obj = argv.pop(0)
     for o, f in objs:
         if o.startswith(obj):
-            return f(argv, option)
+            return f(argv)
 
     stderr(f'Object "{obj}" is unknown, try "bridge help".')
     return EXIT_FAILURE
@@ -47,18 +47,6 @@ def do_obj(argv, option):
 
 def main():
     batch_file = None
-    option = {
-        "preferred_family": AF_UNSPEC,
-        "show_stats": False,
-        "show_details": False,
-        "oneline": False,
-        "timestamp": False,
-        "compress_vlans": False,
-        "force": False,
-        "json": False,
-        "pretty": False,
-        "do_all": False,
-    }
 
     if sys.platform != "darwin":
         stderr("Unupported OS.")
@@ -82,13 +70,13 @@ def main():
             print(f"bridge wrapper, iproute4mac-{iproute4mac.VERSION}")
             exit(0)
         elif "-stats".startswith(opt) or "-statistics".startswith(opt):
-            option["show_stats"] = True
+            OPTION["show_stats"] = True
         elif "-details".startswith(opt):
-            option["show_details"] = True
+            OPTION["show_details"] = True
         elif "-oneline".startswith(opt):
-            option["oneline"] = True
+            OPTION["oneline"] = True
         elif "-timestamp".startswith(opt):
-            option["timestamp"] = True
+            OPTION["timestamp"] = True
         elif "-family".startswith(opt):
             try:
                 opt = argv.pop(0)
@@ -96,26 +84,26 @@ def main():
                 missarg("family type")
             if opt == "help":
                 usage()
-            option["preferred_family"] = read_family(opt)
-            if option["preferred_family"] == AF_UNSPEC:
+            OPTION["preferred_family"] = read_family(opt)
+            if OPTION["preferred_family"] == AF_UNSPEC:
                 invarg("invalid protocol family", opt)
         elif opt == "-4":
-            option["preferred_family"] = AF_INET
+            OPTION["preferred_family"] = AF_INET
         elif opt == "-6":
-            option["preferred_family"] = AF_INET6
+            OPTION["preferred_family"] = AF_INET6
         elif "-netns".startswith(opt):
             do_notimplemented()
         elif matches_color(opt):
             # Color option is not implemented
             pass
         elif "-compressvlans".startswith(opt):
-            option["compress_vlans"] = True
+            OPTION["compress_vlans"] = True
         elif "-force".startswith(opt):
-            option["force"] = True
+            OPTION["force"] = True
         elif "-json".startswith(opt):
-            option["json"] = True
+            OPTION["json"] = True
         elif "-pretty".startswith(opt):
-            option["pretty"] = True
+            OPTION["pretty"] = True
         elif "-batch".startswith(opt):
             try:
                 batch_file = argv.pop(0)
@@ -129,7 +117,7 @@ def main():
         do_notimplemented()
 
     if argv:
-        return do_obj(argv, option)
+        return do_obj(argv)
 
     usage()
 

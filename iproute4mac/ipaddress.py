@@ -59,14 +59,14 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
 #           netdevsim | nlmon | rmnet | sit | team | team_slave |
 #           vcan | veth | vlan | vrf | vti | vxcan | vxlan | wwan |
 #           xfrm }
-def ipaddr_list(argv, option, usage=usage):
+def ipaddr_list(argv, usage=usage):
     res = ifconfig.exec("-v", "-L", "-a")
-    links = ifconfig.parse(res, option)
+    links = ifconfig.parse(res)
     while argv:
         opt = argv.pop(0)
         if strcmp(opt, "to"):
             # to = next_arg(argv)
-            # get_prefix(to, option['preferred_family'])
+            # get_prefix(to, OPTION['preferred_family'])
             do_notimplemented()
         elif strcmp(opt, "scope"):
             scope = next_arg(argv)
@@ -118,22 +118,22 @@ def ipaddr_list(argv, option, usage=usage):
                 stderr(f'Device "{opt}" does not exist.')
                 exit(-1)
 
-    if not option["show_details"]:
+    if not OPTION["show_details"]:
         delete_keys(links, "linkinfo")
 
-    if option["preferred_family"] in (AF_INET, AF_INET6, AF_MPLS, AF_BRIDGE):
-        family = family_name(option["preferred_family"])
+    if OPTION["preferred_family"] in (AF_INET, AF_INET6, AF_MPLS, AF_BRIDGE):
+        family = family_name(OPTION["preferred_family"])
         links = [link for link in links if "addr_info" in link and any(addr["family"] == family for addr in link["addr_info"])]
-    elif option["preferred_family"] == AF_PACKET:
+    elif OPTION["preferred_family"] == AF_PACKET:
         delete_keys(links, "addr_info")
 
-    ifconfig.dumps(links, option)
+    ifconfig.dumps(links)
     return EXIT_SUCCESS
 
 
-def do_ipaddr(argv, option):
+def do_ipaddr(argv):
     if not argv:
-        return ipaddr_list(argv, option)
+        return ipaddr_list(argv)
 
     cmd = argv.pop(0)
     if matches(cmd, "add"):
@@ -145,7 +145,7 @@ def do_ipaddr(argv, option):
     elif matches(cmd, "delete"):
         return do_notimplemented()
     elif matches(cmd, "show", "lst", "list"):
-        return ipaddr_list(argv, option)
+        return ipaddr_list(argv)
     elif matches(cmd, "flush"):
         return do_notimplemented()
     elif matches(cmd, "save"):

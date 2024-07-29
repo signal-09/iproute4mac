@@ -85,20 +85,20 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
 #         | ipvlan | ipvtap | lowpan | geneve | bareudp | vrf | macsec
 #         | netdevsim | rmnet | xfrm ]
 # ETYPE := [ TYPE | bridge_slave | bond_slave ]
-def iplink_list(argv, option):
-    option["preferred_family"] = AF_PACKET
-    return ipaddr_list(argv, option, usage)
+def iplink_list(argv):
+    OPTION["preferred_family"] = AF_PACKET
+    return ipaddr_list(argv, usage)
 
 
-def do_iplink(argv, option):
+def do_iplink(argv):
     if not argv:
-        return iplink_list(argv, option)
+        return iplink_list(argv)
 
     cmd = argv.pop(0)
     if matches(cmd, "add", "change", "set", "replace", "delete"):
-        return iplink_modify(argv, option)
+        return iplink_modify(argv)
     elif matches(cmd, "show", "lst", "list"):
-        return iplink_list(argv, option)
+        return iplink_list(argv)
     elif matches(cmd, "xstats"):
         return do_notimplemented()
     elif matches(cmd, "afstats"):

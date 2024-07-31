@@ -79,64 +79,58 @@ def parse(res):
         match = netstatRegEx(line)
 
         if match.route:
-            route = match.route.groupdict()
-            debug(f"Found route {route}")
+            debug(f"Found route: {line.strip()}")
+            dst, prefix, gateway, flags, dev, expire = match.route.groups()
 
-            if route["flags"] == RTF_WASCLONED or route["flags"] == RTF_PROXY:
-                debug("Skip cloned/proxy rotue")
+            if RTF_WASCLONED in flags:
+                debug("Skip cloned rotue")
+                continue
+            if RTF_PROXY in flags:
+                debug("Skip proxy rotue")
                 continue
 
-            if re.search(LLADDR, route["gateway"]):
+            if prefix:
+                dst = f"{dst}/{prefix}"
+            dst = Prefix(dst)
+
+            scope = None
+            if re.match(LLADDR, gateway):
                 if not OPTION["show_details"]:
                     debug("Skip host rotue")
                     continue
-                del route["gateway"]
-
-            if re.match(IPV4ADDR, route["dst"]) or ("gateway" in route and re.match(IPV4ADDR, route["gateway"])):
-                family = AF_INET
+                gateway = None
+            elif gateway.startswith("link#"):
+                scope = "link"
+                gateway = None
             else:
-                family = AF_INET6
-            if family == AF_INET and OPTION["preferred_family"] == AF_INET6:
-                debug("Skip IPv4 rotue")
-                continue
-            if family == AF_INET6 and OPTION["preferred_family"] == AF_INET:
-                debug("Skip IPv6 rotue")
-                continue
+                gateway = Prefix(gateway)
+                if dst.family == AF_UNSPEC:
+                    dst.family = gateway.family
 
-            if route["dst"] != "default" and family == AF_INET:
-                dots = route["dst"].count(".")
-                if dots < 3:
-                    route["dst"] = route["dst"] + ".0" * (3 - dots)
-                    if not route["prefix"]:
-                        route["prefix"] = 8 * (dots + 1)
-            if route["prefix"]:
-                route["dst"] = f"{route["dst"]}/{route["prefix"]}"
+            if OPTION["preferred_family"] != AF_UNSPEC and dst.family != OPTION["preferred_family"]:
+                debug("Skip unmatched IP version rotue")
+                continue
 
             # protocol
-            if RTF_STATIC in route["flags"]:
+            if RTF_STATIC in flags:
                 protocol = "static"
-            elif any(flag in route["flags"] for flag in (RTF_DYNAMIC, RTF_MODIFIED)):
+            elif any(flag in flags for flag in (RTF_DYNAMIC, RTF_MODIFIED)):
                 protocol = "redirect"
             else:
                 protocol = "kernel"
 
             # scope
-            if RTF_HOST in route["flags"]:
+            if RTF_HOST in flags:
                 scope = "host"
-            if "gateway" in route and route["gateway"].startswith("link#"):
-                scope = "link"
-                del route["gateway"]
             elif OPTION["show_details"]:
                 scope = "global"
-            else:
-                scope = None
 
             # address type
-            if RTF_BLACKHOLE in route["flags"]:
+            if RTF_BLACKHOLE in flags:
                 addr_type = "blackhole"
-            elif RTF_BROADCAST in route["flags"]:
+            elif RTF_BROADCAST in flags:
                 addr_type = "broadcast"
-            elif RTF_MULTICAST in route["flags"]:
+            elif RTF_MULTICAST in flags:
                 addr_type = "multicast"
             elif OPTION["show_details"]:
                 addr_type = "unicast"
@@ -145,12 +139,12 @@ def parse(res):
 
             route = {
                 "type": addr_type,
-                "dst": route["dst"],
-                "gateway": route["gateway"] if "gateway" in route else None,
-                "dev": route["dev"],
+                "dst": dst,
+                "gateway": gateway,
+                "dev": dev,
                 "protocol": protocol,
                 "scope": scope,
-                "expire": int(route["expire"]) if route["expire"] and route["expire"] != "!" else None,
+                "expire": int(expire) if expire and expire.isdigit() else None,
                 "flags": [],
             }
             routes.append({k: v for k, v in route.items() if v is not None})

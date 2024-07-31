@@ -108,9 +108,9 @@ def parse(res):
         match = routeGetRegEx(line)
 
         if match.dst:
-            route["dst"] = match.dst.group("dst")
+            route["dst"] = Prefix(match.dst.group("dst"))
         elif match.gateway:
-            route["gateway"] = match.gateway.group("gateway")
+            route["gateway"] = Prefix(match.gateway.group("gateway"))
         elif match.dev:
             route["dev"] = match.dev.group("dev")
         elif match.flags:

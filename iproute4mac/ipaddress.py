@@ -41,32 +41,14 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
     exit(-1)
 
 
-# ip address [ show [ dev IFNAME ] [ scope SCOPE-ID ] [ master DEVICE ]
-#                   [ type TYPE ] [ to PREFIX ] [ FLAG-LIST ]
-#                   [ label LABEL ] [up] [ vrf NAME ] ]
-# SCOPE-ID := [ host | link | global | NUMBER ]
-# FLAG-LIST := [ FLAG-LIST ] FLAG
-# FLAG  := [ permanent | dynamic | secondary | primary |
-#            [-]tentative | [-]deprecated | [-]dadfailed | temporary |
-#            CONFFLAG-LIST ]
-# CONFFLAG-LIST := [ CONFFLAG-LIST ] CONFFLAG
-# CONFFLAG  := [ home | nodad | mngtmpaddr | noprefixroute | autojoin ]
-# TYPE := { bareudp | bond | bond_slave | bridge | bridge_slave |
-#           dummy | erspan | geneve | gre | gretap | ifb |
-#           ip6erspan | ip6gre | ip6gretap | ip6tnl |
-#           ipip | ipoib | ipvlan | ipvtap |
-#           macsec | macvlan | macvtap |
-#           netdevsim | nlmon | rmnet | sit | team | team_slave |
-#           vcan | veth | vlan | vrf | vti | vxcan | vxlan | wwan |
-#           xfrm }
-def ipaddr_list(argv, usage=usage):
+def get_ifconfig_links(argv, usage=usage):
     res = ifconfig.exec("-v", "-L", "-a")
     links = ifconfig.parse(res)
     while argv:
         opt = argv.pop(0)
         if strcmp(opt, "to"):
             # to = next_arg(argv)
-            # get_prefix(to, OPTION['preferred_family'])
+            # get_prefix(to, OPTION["preferred_family"])
             do_notimplemented()
         elif strcmp(opt, "scope"):
             scope = next_arg(argv)
@@ -121,13 +103,34 @@ def ipaddr_list(argv, usage=usage):
     if not OPTION["show_details"]:
         delete_keys(links, "linkinfo")
 
+    return links
+
+
+# ip address [ show [ dev IFNAME ] [ scope SCOPE-ID ] [ master DEVICE ]
+#                   [ type TYPE ] [ to PREFIX ] [ FLAG-LIST ]
+#                   [ label LABEL ] [up] [ vrf NAME ] ]
+# SCOPE-ID := [ host | link | global | NUMBER ]
+# FLAG-LIST := [ FLAG-LIST ] FLAG
+# FLAG  := [ permanent | dynamic | secondary | primary |
+#            [-]tentative | [-]deprecated | [-]dadfailed | temporary |
+#            CONFFLAG-LIST ]
+# CONFFLAG-LIST := [ CONFFLAG-LIST ] CONFFLAG
+# CONFFLAG  := [ home | nodad | mngtmpaddr | noprefixroute | autojoin ]
+# TYPE := { bareudp | bond | bond_slave | bridge | bridge_slave |
+#           dummy | erspan | geneve | gre | gretap | ifb |
+#           ip6erspan | ip6gre | ip6gretap | ip6tnl |
+#           ipip | ipoib | ipvlan | ipvtap |
+#           macsec | macvlan | macvtap |
+#           netdevsim | nlmon | rmnet | sit | team | team_slave |
+#           vcan | veth | vlan | vrf | vti | vxcan | vxlan | wwan |
+#           xfrm }
+def ipaddr_list(argv):
+    links = get_ifconfig_links(argv)
     if OPTION["preferred_family"] in (AF_INET, AF_INET6, AF_MPLS, AF_BRIDGE):
         family = family_name(OPTION["preferred_family"])
         links = [link for link in links if "addr_info" in link and any(addr["family"] == family for addr in link["addr_info"])]
-    elif OPTION["preferred_family"] == AF_PACKET:
-        delete_keys(links, "addr_info")
-
     ifconfig.dumps(links)
+
     return EXIT_SUCCESS
 
 

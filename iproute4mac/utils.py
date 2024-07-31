@@ -10,11 +10,12 @@ from _ctypes import PyObj_FromPtr
 
 
 """ Costants """
-LOG_ERROR = 0
-LOG_WARN = 1
-LOG_INFO = 2
-LOG_DEBUG = 3
-LOG_LABEL = ("Error", "Warning", "Info", "Debug")
+LOG_STDERR = 0
+LOG_ERROR = 1
+LOG_WARN = 2
+LOG_INFO = 3
+LOG_DEBUG = 4
+LOG_LABEL = (None, "Error", "Warning", "Info", "Debug")
 
 # socket.h
 AF_UNSPEC = 0
@@ -71,6 +72,9 @@ IPV6ADDR = f"(?:{IPV6ADDR})"
 ND6_INFINITE_LIFETIME = 0xFFFFFFFF
 
 
+IFNAME = r"(?:\w+\d+)"
+
+
 """ Global options """
 OPTION = {
     "preferred_family": AF_UNSPEC,
@@ -91,7 +95,7 @@ OPTION = {
     "do_all": False,
     "uid": os.getuid(),
     "compress_vlans": False,
-    "verbose": 0,
+    "verbose": 1,
 }
 
 
@@ -99,12 +103,14 @@ def stdout(*argv, sep="", end=""):
     print(*argv, sep=sep, end=end)
 
 
-def stderr(text, log_level=LOG_ERROR):
+def stderr(text, log_level=LOG_STDERR):
     if OPTION["verbose"] < log_level:
         return
     if text[-1] != "\n":
         text += "\n"
-    sys.stderr.write(LOG_LABEL[log_level] + ": " + text)
+    if log_level > LOG_STDERR:
+        text = LOG_LABEL[log_level] + ": " + text
+    sys.stderr.write(text)
 
 
 def error(text):
@@ -130,6 +136,14 @@ def missarg(key):
 
 def invarg(msg, arg):
     error(f'argument "{arg}" is wrong: {msg}')
+
+
+def duparg(key, arg):
+    error(f'duplicate "{key}": "{arg}" is the second value.')
+
+
+def duparg2(key, arg):
+    error(f'either "{key}" is duplicate, or "{arg}" is a garbage.')
 
 
 def incomplete_command():
@@ -321,43 +335,56 @@ class Prefix:
         if prefix == "default":
             self._prefix = None
             self._any = False
-        elif prefix == "any":
+            return
+        if prefix == "any":
             self._prefix = None
             self._any = True
-        elif "/" in prefix:
-            self._prefix = ipaddress.ip_network(prefix)
-            self._any = False
+            return
+        self._any = False
+        if "/" in prefix:
+            prefix, prefixlen = prefix.split("/")
+        else:
+            prefixlen = None
+        if ":" not in prefix and (dots := prefix.count(".")) < 3:
+            prefix += ".0" * (3 - dots)
+            if not prefixlen:
+                prefixlen = str((dots + 1) * 8)
+        if prefixlen:
+            self._prefix = ipaddress.ip_network(f"{prefix}/{prefixlen}")
         else:
             self._prefix = ipaddress.ip_address(prefix)
-            self._any = False
 
     def __eq__(self, other):
-        if self.family != other.family:
-            return False
-        if isinstance(type(self._prefix), type(other.prefix)):
-            return self._prefix == other.prefix
-        if self.is_host and other.is_host:
-            return self.address == other.address
+        if self._prefix and other._prefix:
+            return self.prefixlen == other.prefixlen and self.address == other.address
+        if self._is_default and other.is_default:
+            return True
+        if other._is_default and self.is_default:
+            return True
         return False
 
     def __contains__(self, other):
-        if isinstance(self._prefix, ipaddress.IPv4Network | ipaddress.IPv6Network):
+        if self._is_network:
             if other.is_host:
                 return other.address in self._prefix
             else:
-                return other.prefix.subnet_of(self._prefix)
-        elif other.is_host:
+                return other._prefix.subnet_of(self._prefix)
+        if other.is_host:
             return other.address == self._prefix
+        if self._is_default and other.is_default:
+            return True
+        if other._is_default and self.is_default:
+            return True
         return False
 
-    def __repr__(self):
+    def __str__(self):
         if self.is_default:
             return "default"
         if self.is_any:
             return "any"
         return str(self._prefix)
 
-    def __str__(self):
+    def __repr__(self):
         if self._prefix:
             return str(self._prefix)
         if self.is_any:

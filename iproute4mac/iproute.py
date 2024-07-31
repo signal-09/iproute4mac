@@ -279,12 +279,7 @@ def iproute_modify(cmd, argv):
             tid = next_arg(argv)
             do_notimplemented([tid])
         elif strcmp(opt, "dev", "oif"):
-            dev = next_arg(argv)
-            # try:
-            #     lookup for dev in ifconfig
-            # except:
-            #     invarg('Cannot find device "{dev}"')
-            entry["dev"] = dev
+            entry["dev"] = next_arg(argv)
         elif matches(opt, "pref"):
             pref = next_arg(argv)
             try:

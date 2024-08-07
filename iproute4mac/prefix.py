@@ -6,14 +6,27 @@ from iproute4mac import *
 class Prefix:
     __slots__ = ("_prefix", "_any")
 
-    def __init__(self, prefix):
+    def __init__(self, prefix, family=None):
         if prefix == "default":
-            self._prefix = None
+            if family == AF_INET:
+                self._prefix = ipaddress.ip_network("0.0.0.0/0")
+            elif family == AF_INET6:
+                self._prefix = ipaddress.ip_network("::/0")
+            else:
+                self._prefix = None
             self._any = False
             return
+        # if prefix == "localhost":
         if prefix == "any":
-            self._prefix = None
-            self._any = True
+            if family == AF_INET:
+                self._prefix = ipaddress.ip_address("0.0.0.0")
+                self._any = False
+            elif family == AF_INET6:
+                self._prefix = ipaddress.ip_address("::")
+                self._any = False
+            else:
+                self._prefix = None
+                self._any = True
             return
         self._any = False
         if "/" in prefix:
@@ -28,6 +41,7 @@ class Prefix:
             self._prefix = ipaddress.ip_network(f"{prefix}/{prefixlen}")
         else:
             self._prefix = ipaddress.ip_address(prefix)
+        # if _prefix.family != family raise ValueError
 
     def __eq__(self, other):
         if self._prefix and other._prefix:

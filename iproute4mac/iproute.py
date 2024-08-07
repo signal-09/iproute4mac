@@ -333,6 +333,14 @@ def iproute_modify(cmd, argv):
         else:
             argv += f"{entry['dst']}".split()
 
+    if "rtn" in entry:
+        if entry["rtn"] == route.RTN_BLACKHOLE:
+            if entry["dst"].family == AF_INET:
+                gw = "127.0.0.1"
+            else:
+                gw = "::1"
+            argv += f"{gw} -blackhole".split()
+
     if matches(cmd, "add"):
         iproute_add(argv)
     elif matches(cmd, "delete"):

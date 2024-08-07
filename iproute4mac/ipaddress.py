@@ -76,11 +76,11 @@ def get_ifconfig_links(argv, usage=usage):
             vrf = next_arg(argv)
             if not any(link["ifname"] == vrf for link in links):
                 invarg("Not a valid VRF name", vrf)
-            # if not name_is_vrf(vrf):
+            # if not is_vrf(vrf):
             #     invarg('Not a valid VRF name', vrf)
             # links = [link for link in links if ('master' in link and link['master'] == vrf)]
             # FIXME: https://wiki.netunix.net/freebsd/network/vrf/
-            do_notimplemented()
+            do_notimplemented([opt])
         elif strcmp(opt, "nomaster"):
             links = [link for link in links if "master" not in link]
         elif strcmp(opt, "type"):
@@ -106,24 +106,6 @@ def get_ifconfig_links(argv, usage=usage):
     return links
 
 
-# ip address [ show [ dev IFNAME ] [ scope SCOPE-ID ] [ master DEVICE ]
-#                   [ type TYPE ] [ to PREFIX ] [ FLAG-LIST ]
-#                   [ label LABEL ] [up] [ vrf NAME ] ]
-# SCOPE-ID := [ host | link | global | NUMBER ]
-# FLAG-LIST := [ FLAG-LIST ] FLAG
-# FLAG  := [ permanent | dynamic | secondary | primary |
-#            [-]tentative | [-]deprecated | [-]dadfailed | temporary |
-#            CONFFLAG-LIST ]
-# CONFFLAG-LIST := [ CONFFLAG-LIST ] CONFFLAG
-# CONFFLAG  := [ home | nodad | mngtmpaddr | noprefixroute | autojoin ]
-# TYPE := { bareudp | bond | bond_slave | bridge | bridge_slave |
-#           dummy | erspan | geneve | gre | gretap | ifb |
-#           ip6erspan | ip6gre | ip6gretap | ip6tnl |
-#           ipip | ipoib | ipvlan | ipvtap |
-#           macsec | macvlan | macvtap |
-#           netdevsim | nlmon | rmnet | sit | team | team_slave |
-#           vcan | veth | vlan | vrf | vti | vxcan | vxlan | wwan |
-#           xfrm }
 def ipaddr_list(argv):
     links = get_ifconfig_links(argv)
     if OPTION["preferred_family"] in (AF_INET, AF_INET6, AF_MPLS, AF_BRIDGE):

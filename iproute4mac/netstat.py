@@ -1,5 +1,3 @@
-import re
-
 from iproute4mac.utils import *
 
 
@@ -40,8 +38,8 @@ def dumps(routes):
         print(json_dumps(routes, OPTION["pretty"]))
         return
 
-    if not routes:
-        return
+    # if not routes:
+    #    return
 
     for route in routes:
         if OPTION["show_details"] or "type" in route:

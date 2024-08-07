@@ -1,8 +1,5 @@
 #!/usr/bin/env python3
 
-import sys
-import iproute4mac
-
 from iproute4mac.utils import *
 from iproute4mac.iplink import do_iplink
 from iproute4mac.ipaddress import do_ipaddr
@@ -33,8 +30,8 @@ where  OBJECT := { address | addrlabel | fou | help | ila | ioam | l2tp | link |
     exit(-1)
 
 
-""" Implemented objects """
-objs = [
+# Implemented objects
+OBJS = [
     ("address", do_ipaddr),
     ("addrlabel", do_notimplemented),
     ("maddress", do_notimplemented),
@@ -74,7 +71,7 @@ objs = [
 
 def do_obj(argv):
     obj = argv.pop(0)
-    for o, f in objs:
+    for o, f in OBJS:
         if o.startswith(obj):
             return f(argv)
 
@@ -83,12 +80,11 @@ def do_obj(argv):
 
 
 def main():
-    batch_file = None
-
     if sys.platform != "darwin":
         stderr("Unupported OS.")
         exit(-1)
 
+    batch_file = None
     argv = sys.argv[1:]
     while argv:
         if argv[0] == "--":
@@ -146,7 +142,7 @@ def main():
             OPTION["timestamp"] = True
             OPTION["timestamp_short"] = True
         elif matches(opt, "-Version"):
-            print(f"ip wrapper, iproute4mac-{iproute4mac.VERSION}")
+            print(f"ip wrapper, iproute4mac-{VERSION}")
             exit(0)
         elif matches(opt, "-force"):
             OPTION["force"] = True
@@ -169,7 +165,7 @@ def main():
             except ValueError:
                 error("rcvbuf size not a number")
         elif matches_color(opt):
-            # Color option is not implemented
+            # silently ignore not implemented color option
             pass
         elif matches(opt, "-help"):
             usage()
@@ -187,9 +183,12 @@ def main():
                 if len(opt) <= 2:
                     break
                 opt = opt[1:]
+        elif matches(opt, "-quiet"):
+            OPTION["quiet"] = True
         else:
             stderr(f'Option "{opt}" is unknown, try "ip -help".')
             exit(-1)
+
     if batch_file:
         do_notimplemented()
 

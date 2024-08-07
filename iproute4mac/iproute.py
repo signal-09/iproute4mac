@@ -143,11 +143,10 @@ def iproute_modify(cmd, argv):
             else:
                 modifiers["mtu"] = "-mtu "
             try:
-                mtu = int(mtu)
-                assert 0 <= mtu < 2**32
+                assert 0 <= int(mtu) < 2**32
             except (ValueError, AssertionError):
                 invarg('"mtu" value is invalid', mtu)
-            modifiers["mtu"] += str(mtu)
+            modifiers["mtu"] += mtu
         elif strcmp(opt, "hoplimit"):
             hoplimit = next_arg(argv)
             if strcmp(hoplimit, "lock"):
@@ -156,11 +155,10 @@ def iproute_modify(cmd, argv):
             else:
                 modifiers["hoplimit"] = "-hopcount "
             try:
-                hoplimit = int(hoplimit)
-                assert 0 <= hoplimit < 2**8
+                assert 0 <= int(hoplimit) < 2**8
             except (ValueError, AssertionError):
                 invarg('"hoplimit" value is invalid', hoplimit)
-            modifiers["hopcount"] += str(hopcount)
+            modifiers["hopcount"] += hopcount
         elif strcmp(opt, "advmss"):
             mss = next_arg(argv)
             if strcmp(mss, "lock"):
@@ -189,11 +187,10 @@ def iproute_modify(cmd, argv):
             else:
                 modifiers["rtt"] = "-rtt "
             try:
-                rtt = int(rtt)
-                assert 0 <= rtt < 2**32
+                assert 0 <= int(rtt) < 2**32
             except (ValueError, AssertionError):
                 invarg('"rtt" value is invalid', rtt)
-            modifiers["rtt"] += str(rtt)
+            modifiers["rtt"] += rtt
         elif strcmp(opt, "rto_min"):
             rto_min = next_arg(argv)
             try:
@@ -236,11 +233,10 @@ def iproute_modify(cmd, argv):
             else:
                 modifiers["rttvar"] = "-rttvar "
             try:
-                win = int(win)
-                assert 0 <= win < 2**32
+                assert 0 <= int(win) < 2**32
             except (ValueError, AssertionError):
                 invarg('"rttvar" value is invalid', win)
-            modifiers["rttvar"] += str(win)
+            modifiers["rttvar"] += win
         elif matches(opt, "ssthresh"):
             win = next_arg(argv)
             if strcmp(rtt, "lock"):
@@ -249,11 +245,10 @@ def iproute_modify(cmd, argv):
             else:
                 modifiers["ssthresh"] = "-ssthresh "
             try:
-                win = int(win)
-                assert 0 <= win < 2**32
+                assert 0 <= int(win) < 2**32
             except (ValueError, AssertionError):
                 invarg('"ssthresh" value is invalid', win)
-            modifiers["ssthresh"] += str(win)
+            modifiers["ssthresh"] += win
         elif matches(opt, "realms"):
             realm = next_arg(argv)
             do_notimplemented([realm])
@@ -432,7 +427,9 @@ def iproute_get(argv):
             prefix = get_prefix(opt, OPTION["preferred_family"])
             if not prefix.is_host:
                 stderr(
-                    f"Warning: /{prefix.prefixlen} as prefix is invalid, only /{prefix._max_prefixlen} (or none) is supported."
+                    "Warning: "
+                    f"/{prefix.prefixlen} as prefix is invalid, "
+                    f"only /{prefix._max_prefixlen} (or none) is supported."
                 )
                 prefix = Prefix(str(prefix.address))
 
@@ -451,15 +448,6 @@ def iproute_get(argv):
     return EXIT_SUCCESS
 
 
-# ip route [ list [ SELECTOR ] ]
-# SELECTOR := [ root PREFIX ] [ match PREFIX ] [ exact PREFIX ]
-#             [ table TABLE_ID ] [ vrf NAME ] [ proto RTPROTO ]
-#             [ type TYPE ] [ scope SCOPE ]
-# TYPE := { unicast | local | broadcast | multicast | throw |
-#           unreachable | prohibit | blackhole | nat }
-# TABLE_ID := [ local | main | default | all | NUMBER ]
-# SCOPE := [ host | link | global | NUMBER ]
-# RTPROTO := [ kernel | boot | static | NUMBER ]
 def iproute_list(argv):
     if OPTION["preferred_family"] == AF_UNSPEC:
         OPTION["preferred_family"] = AF_INET
@@ -559,12 +547,12 @@ def iproute_list(argv):
             elif matches(opt, "match"):
                 opt = next_arg(argv)
                 prefix = get_prefix(opt, OPTION["preferred_family"])
-                entries = [entry for entry in entries if "dst" in entry and prefix in Prefix(entry["dst"])]
+                entries = [entry for entry in entries if "dst" in entry and prefix in entry["dst"]]
             else:
                 if matches(opt, "exact"):
                     opt = next_arg(argv)
                 prefix = get_prefix(opt, OPTION["preferred_family"])
-                entries = [entry for entry in entries if "dst" in entry and prefix == Prefix(entry["dst"])]
+                entries = [entry for entry in entries if "dst" in entry and prefix == entry["dst"]]
 
     netstat.dumps(entries)
 

@@ -1,16 +1,12 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-import iproute4mac
-
 from iproute4mac.utils import *
 from iproute4mac.iplink import do_iplink
 from iproute4mac.ipaddress import do_ipaddr
 from iproute4mac.iproute import do_iproute
 
 
-def do_help(argv=[], option={}):
+def do_help(argv=[]):
     usage()
 
 
@@ -34,8 +30,8 @@ where  OBJECT := { address | addrlabel | fou | help | ila | ioam | l2tp | link |
     exit(-1)
 
 
-""" Implemented objects """
-objs = [
+# Implemented objects
+OBJS = [
     ("address", do_ipaddr),
     ("addrlabel", do_notimplemented),
     ("maddress", do_notimplemented),
@@ -73,43 +69,22 @@ objs = [
 ]
 
 
-def do_obj(argv, option):
+def do_obj(argv):
     obj = argv.pop(0)
-    for o, f in objs:
+    for o, f in OBJS:
         if o.startswith(obj):
-            return f(argv, option)
+            return f(argv)
 
     stderr(f'Object "{obj}" is unknown, try "ip help".')
     return EXIT_FAILURE
 
 
 def main():
-    batch_file = None
-    option = {
-        "preferred_family": AF_UNSPEC,
-        "human_readable": False,
-        "use_iec": False,
-        "show_stats": False,
-        "show_details": False,
-        "oneline": False,
-        "brief": False,
-        "json": False,
-        "pretty": False,
-        "timestamp": False,
-        "timestamp_short": False,
-        "echo_request": False,
-        "force": False,
-        "max_flush_loops": 10,
-        "batch_mode": False,
-        "do_all": False,
-        "uid": os.getuid(),
-        "verbose": 0,
-    }
-
     if sys.platform != "darwin":
         stderr("Unupported OS.")
         exit(-1)
 
+    batch_file = None
     argv = sys.argv[1:]
     while argv:
         if argv[0] == "--":
@@ -124,7 +99,7 @@ def main():
 
         if matches(opt, "-loops"):
             try:
-                option["max_flush_loops"] = int(argv.pop(0))
+                OPTION["max_flush_loops"] = int(argv.pop(0))
             except IndexError:
                 missarg("loop count")
             except ValueError:
@@ -136,74 +111,80 @@ def main():
                 missarg("family type")
             if strcmp(opt, "help"):
                 usage()
-            option["preferred_family"] = read_family(opt)
-            if option["preferred_family"] == AF_UNSPEC:
+            OPTION["preferred_family"] = read_family(opt)
+            if OPTION["preferred_family"] == AF_UNSPEC:
                 invarg("invalid protocol family", opt)
         elif strcmp(opt, "-4"):
-            option["preferred_family"] = AF_INET
+            OPTION["preferred_family"] = AF_INET
         elif strcmp(opt, "-6"):
-            option["preferred_family"] = AF_INET6
+            OPTION["preferred_family"] = AF_INET6
         elif strcmp(opt, "-0"):
-            option["preferred_family"] = AF_PACKET
+            OPTION["preferred_family"] = AF_PACKET
         elif strcmp(opt, "-M"):
-            option["preferred_family"] = AF_MPLS
+            OPTION["preferred_family"] = AF_MPLS
         elif strcmp(opt, "-B"):
-            option["preferred_family"] = AF_BRIDGE
+            OPTION["preferred_family"] = AF_BRIDGE
         elif matches(opt, "-human-readable"):
-            option["human_readable"] = True
+            OPTION["human_readable"] = True
         elif matches(opt, "-iec"):
-            option["use_iec"] = True
+            OPTION["use_iec"] = True
         elif matches(opt, "-stats", "-statistics"):
-            option["show_stats"] = True
+            OPTION["show_stats"] = True
         elif matches(opt, "-details"):
-            option["show_details"] = True
+            OPTION["show_details"] = True
         elif matches(opt, "-resolve"):
-            option["resolve_hosts"] = True
+            OPTION["resolve_hosts"] = True
         elif matches(opt, "-oneline"):
-            option["oneline"] = True
+            OPTION["oneline"] = True
         elif matches(opt, "-timestamp"):
-            option["timestamp"] = True
+            OPTION["timestamp"] = True
         elif matches(opt, "-tshort"):
-            option["timestamp"] = True
-            option["timestamp_short"] = True
+            OPTION["timestamp"] = True
+            OPTION["timestamp_short"] = True
         elif matches(opt, "-Version"):
-            print(f"ip wrapper, iproute4mac-{iproute4mac.VERSION}")
+            print(f"ip wrapper, iproute4mac-{VERSION}")
             exit(0)
         elif matches(opt, "-force"):
-            option["force"] = True
+            OPTION["force"] = True
         elif matches(opt, "-batch"):
             try:
                 batch_file = argv.pop(0)
             except IndexError:
                 missarg("batch file")
         elif matches(opt, "-brief"):
-            option["brief"] = True
+            OPTION["brief"] = True
         elif matches(opt, "-json"):
-            option["json"] = True
+            OPTION["json"] = True
         elif matches(opt, "-pretty"):
-            option["pretty"] = True
+            OPTION["pretty"] = True
         elif matches(opt, "-rcvbuf"):
             try:
-                option["rcvbuf"] = int(argv.pop(0))
+                OPTION["rcvbuf"] = int(argv.pop(0))
             except IndexError:
                 missarg("rcvbuf size")
             except ValueError:
                 error("rcvbuf size not a number")
         elif matches_color(opt):
-            # Color option is not implemented
+            # silently ignore not implemented color option
             pass
         elif matches(opt, "-help"):
             usage()
         elif matches(opt, "-netns"):
             do_notimplemented()
         elif matches(opt, "-Numeric"):
-            option["numeric"] = True
+            OPTION["numeric"] = True
         elif matches(opt, "-all"):
-            option["do_all"] = True
+            OPTION["do_all"] = True
         elif strcmp(opt, "-echo"):
-            option["echo_request"] = True
-        elif strcmp(opt, "-verbose"):
-            option["verbose"] += 1
+            OPTION["echo_request"] = True
+        elif matches(opt, "-verbose", "-vvv"):
+            while opt[1] == "v" and OPTION["verbose"] < LOG_DEBUG:
+                OPTION["verbose"] += 1
+                if len(opt) <= 2:
+                    break
+                opt = opt[1:]
+        elif matches(opt, "-quiet"):
+            OPTION["quiet"] = True
         else:
             stderr(f'Option "{opt}" is unknown, try "ip -help".')
             exit(-1)
@@ -212,7 +193,7 @@ def main():
         do_notimplemented()
 
     if argv:
-        return do_obj(argv, option)
+        return do_obj(argv)
 
     usage()
 

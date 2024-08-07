@@ -1,14 +1,9 @@
 #!/usr/bin/env python3
 
-import sys
-
-import iproute4mac
 from iproute4mac.utils import *
-from iproute4mac.iplink import *
-from iproute4mac.ipaddress import *
 
 
-def do_help(argv=[], option={}):
+def do_help(argv=[]):
     usage()
 
 
@@ -23,8 +18,8 @@ where  OBJECT := { link | fdb | mdb | vlan | vni | monitor }
     exit(-1)
 
 
-""" Implemented objects """
-objs = [
+# Implemented objects
+OBJS = [
     ("link", do_notimplemented),
     ("fdb", do_notimplemented),
     ("mdb", do_notimplemented),
@@ -35,35 +30,22 @@ objs = [
 ]
 
 
-def do_obj(argv, option):
+def do_obj(argv):
     obj = argv.pop(0)
-    for o, f in objs:
+    for o, f in OBJS:
         if o.startswith(obj):
-            return f(argv, option)
+            return f(argv)
 
     stderr(f'Object "{obj}" is unknown, try "bridge help".')
     return EXIT_FAILURE
 
 
 def main():
-    batch_file = None
-    option = {
-        "preferred_family": AF_UNSPEC,
-        "show_stats": False,
-        "show_details": False,
-        "oneline": False,
-        "timestamp": False,
-        "compress_vlans": False,
-        "force": False,
-        "json": False,
-        "pretty": False,
-        "do_all": False,
-    }
-
     if sys.platform != "darwin":
         stderr("Unupported OS.")
         exit(-1)
 
+    batch_file = None
     argv = sys.argv[1:]
     while argv:
         if argv[0] == "--":
@@ -76,47 +58,47 @@ def main():
         if opt[1] == "-":
             opt = opt[1:]
 
-        if "-help".startswith(opt):
+        if matches(opt, "-help"):
             usage()
-        elif "-Version".startswith(opt):
+        elif matches(opt, "-Version"):
             print(f"bridge wrapper, iproute4mac-{iproute4mac.VERSION}")
             exit(0)
-        elif "-stats".startswith(opt) or "-statistics".startswith(opt):
-            option["show_stats"] = True
-        elif "-details".startswith(opt):
-            option["show_details"] = True
-        elif "-oneline".startswith(opt):
-            option["oneline"] = True
-        elif "-timestamp".startswith(opt):
-            option["timestamp"] = True
-        elif "-family".startswith(opt):
+        elif matches(opt, "-stats".startswith(opt) or "-statistics"):
+            OPTION["show_stats"] = True
+        elif matches(opt, "-details"):
+            OPTION["show_details"] = True
+        elif matches(opt, "-oneline"):
+            OPTION["oneline"] = True
+        elif matches(opt, "-timestamp"):
+            OPTION["timestamp"] = True
+        elif matches(opt, "-family"):
             try:
                 opt = argv.pop(0)
             except IndexError:
                 missarg("family type")
-            if opt == "help":
+            if strcmp(opt, "help"):
                 usage()
-            option["preferred_family"] = read_family(opt)
-            if option["preferred_family"] == AF_UNSPEC:
+            OPTION["preferred_family"] = read_family(opt)
+            if OPTION["preferred_family"] == AF_UNSPEC:
                 invarg("invalid protocol family", opt)
-        elif opt == "-4":
-            option["preferred_family"] = AF_INET
-        elif opt == "-6":
-            option["preferred_family"] = AF_INET6
-        elif "-netns".startswith(opt):
+        elif strcmp(opt, "-4"):
+            OPTION["preferred_family"] = AF_INET
+        elif strcmp(opt, "-6"):
+            OPTION["preferred_family"] = AF_INET6
+        elif matches(opt, "-netns"):
             do_notimplemented()
         elif matches_color(opt):
             # Color option is not implemented
             pass
-        elif "-compressvlans".startswith(opt):
-            option["compress_vlans"] = True
-        elif "-force".startswith(opt):
-            option["force"] = True
-        elif "-json".startswith(opt):
-            option["json"] = True
-        elif "-pretty".startswith(opt):
-            option["pretty"] = True
-        elif "-batch".startswith(opt):
+        elif matches(opt, "-compressvlans"):
+            OPTION["compress_vlans"] = True
+        elif matches(opt, "-force"):
+            OPTION["force"] = True
+        elif matches(opt, "-json"):
+            OPTION["json"] = True
+        elif matches(opt, "-pretty"):
+            OPTION["pretty"] = True
+        elif matches(opt, "-batch"):
             try:
                 batch_file = argv.pop(0)
             except IndexError:
@@ -129,7 +111,7 @@ def main():
         do_notimplemented()
 
     if argv:
-        return do_obj(argv, option)
+        return do_obj(argv)
 
     usage()
 

@@ -41,32 +41,14 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
     exit(-1)
 
 
-# ip address [ show [ dev IFNAME ] [ scope SCOPE-ID ] [ master DEVICE ]
-#                   [ type TYPE ] [ to PREFIX ] [ FLAG-LIST ]
-#                   [ label LABEL ] [up] [ vrf NAME ] ]
-# SCOPE-ID := [ host | link | global | NUMBER ]
-# FLAG-LIST := [ FLAG-LIST ] FLAG
-# FLAG  := [ permanent | dynamic | secondary | primary |
-#            [-]tentative | [-]deprecated | [-]dadfailed | temporary |
-#            CONFFLAG-LIST ]
-# CONFFLAG-LIST := [ CONFFLAG-LIST ] CONFFLAG
-# CONFFLAG  := [ home | nodad | mngtmpaddr | noprefixroute | autojoin ]
-# TYPE := { bareudp | bond | bond_slave | bridge | bridge_slave |
-#           dummy | erspan | geneve | gre | gretap | ifb |
-#           ip6erspan | ip6gre | ip6gretap | ip6tnl |
-#           ipip | ipoib | ipvlan | ipvtap |
-#           macsec | macvlan | macvtap |
-#           netdevsim | nlmon | rmnet | sit | team | team_slave |
-#           vcan | veth | vlan | vrf | vti | vxcan | vxlan | wwan |
-#           xfrm }
-def ipaddr_list(argv, option, usage=usage):
+def get_ifconfig_links(argv, usage=usage):
     res = ifconfig.exec("-v", "-L", "-a")
-    links = ifconfig.parse(res, option)
+    links = ifconfig.parse(res)
     while argv:
         opt = argv.pop(0)
         if strcmp(opt, "to"):
             # to = next_arg(argv)
-            # get_prefix(to, option['preferred_family'])
+            # get_prefix(to, OPTION["preferred_family"])
             do_notimplemented()
         elif strcmp(opt, "scope"):
             scope = next_arg(argv)
@@ -94,11 +76,11 @@ def ipaddr_list(argv, option, usage=usage):
             vrf = next_arg(argv)
             if not any(link["ifname"] == vrf for link in links):
                 invarg("Not a valid VRF name", vrf)
-            # if not name_is_vrf(vrf):
+            # if not is_vrf(vrf):
             #     invarg('Not a valid VRF name', vrf)
             # links = [link for link in links if ('master' in link and link['master'] == vrf)]
             # FIXME: https://wiki.netunix.net/freebsd/network/vrf/
-            do_notimplemented()
+            do_notimplemented([opt])
         elif strcmp(opt, "nomaster"):
             links = [link for link in links if "master" not in link]
         elif strcmp(opt, "type"):
@@ -118,22 +100,25 @@ def ipaddr_list(argv, option, usage=usage):
                 stderr(f'Device "{opt}" does not exist.')
                 exit(-1)
 
-    if not option["show_details"]:
+    if not OPTION["show_details"]:
         delete_keys(links, "linkinfo")
 
-    if option["preferred_family"] in (AF_INET, AF_INET6, AF_MPLS, AF_BRIDGE):
-        family = family_name(option["preferred_family"])
-        links = [link for link in links if "addr_info" in link and any(addr["family"] == family for addr in link["addr_info"])]
-    elif option["preferred_family"] == AF_PACKET:
-        delete_keys(links, "addr_info")
+    return links
 
-    ifconfig.dumps(links, option)
+
+def ipaddr_list(argv):
+    links = get_ifconfig_links(argv)
+    if OPTION["preferred_family"] in (AF_INET, AF_INET6, AF_MPLS, AF_BRIDGE):
+        family = family_name(OPTION["preferred_family"])
+        links = [link for link in links if "addr_info" in link and any(addr["family"] == family for addr in link["addr_info"])]
+    ifconfig.dumps(links)
+
     return EXIT_SUCCESS
 
 
-def do_ipaddr(argv, option):
+def do_ipaddr(argv):
     if not argv:
-        return ipaddr_list(argv, option)
+        return ipaddr_list(argv)
 
     cmd = argv.pop(0)
     if matches(cmd, "add"):
@@ -145,7 +130,7 @@ def do_ipaddr(argv, option):
     elif matches(cmd, "delete"):
         return do_notimplemented()
     elif matches(cmd, "show", "lst", "list"):
-        return ipaddr_list(argv, option)
+        return ipaddr_list(argv)
     elif matches(cmd, "flush"):
         return do_notimplemented()
     elif matches(cmd, "save"):

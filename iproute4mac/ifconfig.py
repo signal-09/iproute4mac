@@ -1,19 +1,23 @@
-import re
+import iproute4mac.libc as libc
 
 from iproute4mac.utils import *
 
 
-def exec(*argv):
-    return shell("ifconfig", *argv)
+RXQLEN = "net.link.generic.system.rcvq_maxlen"
+TXQLEN = "net.link.generic.system.sndq_maxlen"
 
 
-def dumps(links, option):
-    if option["json"]:
-        print(json_dumps(links, option["pretty"]))
+def exec(*argv, fatal=True):
+    return shell("ifconfig", *argv, fatal=fatal)
+
+
+def dumps(links):
+    if OPTION["json"]:
+        print(json_dumps(links, OPTION["pretty"]))
         return
 
-    if not links:
-        return
+    # if not links:
+    #    return
 
     for link in links:
         stdout(link["ifindex"], ": ", link["ifname"])
@@ -22,7 +26,11 @@ def dumps(links, option):
         stdout(": <", ",".join(link["flags"]), "> mtu ", link["mtu"])
         if "master" in link:
             stdout(" master ", link["master"])
-        stdout(" state ", link["operstate"], end="\n")
+        if "operstate" in link:
+            stdout(" state ", link["operstate"])
+        if "txqlen" in link:
+            stdout(" qlen ", link["txqlen"])
+        stdout(end="\n")
 
         stdout("    link/", link["link_type"])
         if "address" in link:
@@ -161,15 +169,22 @@ def parse_bridge(lines, links, link):
         elif match.filter:
             info_data["ipfilter"] = match.filter.group("filter") != "disabled"
         elif match.member:
-            slave = next(item for item in links if item["ifname"] == match.member.group("member"))
+            ifname = match.member.group("member")
+            slave = next((item for item in links if item["ifname"] == ifname), None)
+            if not slave:
+                slave = {"ifname": ifname}
+                links.append(slave)
             slave["master"] = link["ifname"]
             slave["linkinfo"] = {"info_slave_kind": "bridge"}
         elif match.cache:
             link["linkinfo"].update({"info_data": info_data})
             break
+        elif line:
+            debug(f'Unparsed line "{line.strip()}"')
 
 
-def parse(res, option):
+def parse(res):
+    txqlen = libc.sysctl(TXQLEN)
     links = []
     lines = iter(res.split("\n"))
     while line := next(lines):
@@ -177,12 +192,14 @@ def parse(res, option):
 
         if match.header:
             header = match.header.groupdict()
+            debug(f"Found interface {header}")
             link = {
                 "ifindex": int(header["ifindex"]),
                 "ifname": header["ifname"],
                 "flags": header["flags"].split(",") if header["flags"] != "" else [],
                 "mtu": int(header["mtu"]),
                 "operstate": "UNKNOWN",
+                "txqlen": txqlen,
                 "link_type": "none",
             }
 
@@ -194,8 +211,10 @@ def parse(res, option):
                 link["link_pointtopoint"] = True
 
             if startwith(link["ifname"], "bridge", "bond", "vlan"):
-                link["linkinfo"] = {"info_kind": re.sub(r"[0-9]+", "", link["ifname"])}
+                link["linkinfo"] = {"info_kind": re.sub("[0-9]+", "", link["ifname"])}
 
+            if (index := list_index(links, "ifname", header["ifname"])) >= 0:
+                deep_update(link, links.pop(index))
             links.append(link)
             inet_count = 0
             inet6_count = 0
@@ -209,7 +228,7 @@ def parse(res, option):
             link["broadcast"] = "ff:ff:ff:ff:ff:ff"
         elif match.state:
             link["operstate"] = oper_states[match.state.group("state")]
-        elif match.inet and option["preferred_family"] in (AF_INET, AF_UNSPEC):
+        elif match.inet and OPTION["preferred_family"] in (AF_INET, AF_UNSPEC):
             inet = match.inet.groupdict()
             addr = {"family": "inet", "local": inet["local"]}
             if inet["address"]:
@@ -237,7 +256,7 @@ def parse(res, option):
             else:
                 link["addr_info"] = [addr]
             inet_count += 1
-        elif match.inet6 and option["preferred_family"] in (AF_INET6, AF_UNSPEC):
+        elif match.inet6 and OPTION["preferred_family"] in (AF_INET6, AF_UNSPEC):
             inet6 = match.inet6.groupdict()
             ip = Prefix(inet6["local"])
             if ip.is_link:
@@ -285,5 +304,7 @@ def parse(res, option):
                 }
         elif match.bridge:
             parse_bridge(lines, links, link)
+        elif line:
+            debug(f'Unparsed line "{line.strip()}"')
 
     return links

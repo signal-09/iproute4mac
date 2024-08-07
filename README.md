@@ -7,8 +7,12 @@ This is a macOS network wrapper to imitate GNU/Linux [iproute2](https://wiki.lin
 
 ### Working staff
 
-* `ip link [ show ]`, `ip address [ show ]`, and `ip route [ show ]`
+* `ip address [ list | show ]`
+* `ip link [ list | show ]`
+* `ip link { add | set | change | delete }`
+* `ip route [ list | show ]`
 * `ip route { add | change | replace | delete }`
+* `ip route get`
 
 ## Installation
 
@@ -146,18 +150,126 @@ Shows the vlan devices:
 ip link show type vlan
 ```
 
-Shows devices enslaved by bridge0
+Shows devices enslaved by bridge0:
 ```shell
 ip link show master bridge0
 ```
 
+#### Notes
+
+1. `txqlen` (the transmit queue length) is not configurable on specific interface; a system default value is managed via `sysctl net.link.generic.system.sndq_maxlen` (or `net.link.generic.system.rcvq_maxlen`).
+
+### `ip link add`: add virtual link
+
+Implemented syntax:
+
+> ip link add [ link DEV | ~~parentdev NAME~~ ] [ name ] NAME
+>             [ ~~txqueuelen~~ PACKETS ]
+>             [ address LLADDR ]
+>             [ ~~broadcast LLADDR~~ ]
+>             [ mtu MTU ] [ ~~index IDX~~ ]
+>             [ ~~numtxqueues QUEUE_COUNT~~ ]
+>             [ ~~numrxqueues QUEUE_COUNT~~ ]
+>             [ ~~netns { PID | NETNSNAME | NETNSFILE }~~ ]
+>             type TYPE [ ARGS ]
+
+Create a VLAN with TAG 100 linked to en1:
+
+```shell
+ip link add link en1 name vlan100 type vlan id 100
+```
+
+Create a new bridge interface (auto numbering):
+
+```shell
+ip link add type bridge
+```
+
+Create a new bridge with a specified name:
+
+```shell
+ip link add bridge20 type bridge
+```
+
+Create a new static bond (vs lacp) interface:
+
+```shell
+ip link add bond1 type bond mode active-backup
+```
+
+### `ip link delete`: delete virtual link
+
+Implemented syntax:
+
+> ip link delete { DEVICE | dev DEVICE | ~~group DEVGROUP~~ } type TYPE [ ARGS ]
+
+Delete any kind of virtual interface:
+
+```shell
+ip link del vlan100
+```
+
+### `ip link set` (or `change`): change device attributes
+
+Implemented syntax:
+
+
+### `ip route show`: list routes
+
+Implemented syntax:
+
+> ip route [ show [ SELECTOR ] ]
+>
+> SELECTOR := [ ~~root PREFIX~~ ] [ ~~match PREFIX~~ ] [ ~~exact PREFIX~~ ]
+>             [ ~~table TABLE_ID~~ ] [ ~~vrf NAME~~ ] [ proto RTPROTO ]
+>             [ type TYPE ] [ scope SCOPE ]
+>
+> TYPE := { unicast | ~~local~~ | broadcast | multicast | ~~throw~~ |
+>           ~~unreachable~~ | ~~prohibit~~ | blackhole | ~~nat~~ }
+>
+> ~~TABLE_ID := [ local | main | default | all | NUMBER ]~~
+>
+> SCOPE := [ host | link | global | ~~NUMBER~~ ]
+>
+> RTPROTO := [ kernel | ~~boot~~ | static | ~~NUMBER~~ ]
+
+List routes using a specific gateway:
+
+```shell
+ip route show via 192.168.0.1
+```
+
+List routes using a specific network interface:
+
+```shell
+ip route show dev en1
+```
+
+List routes for multicast:
+
+```shell
+ip route show type multicast
+```
+
+List availabe routes to reach specific network:
+
+```shell
+ip route show to match 192.168.1.0/24
+```
+
+#### Notes
+
+1. `iif` is not honored (is treated like `dev` and `oif`).
+2. *Route tables* are not implemented in macOS (Darwin).
+
 ### `ip route add`: add new route
+### `ip route delete`: delete route
 ### `ip route change`: change route
 ### `ip route replace`: change or add new one
 
 Implemented syntax:
 
-> ip route { add | del | change | ~~append~~ | replace } ROUTE
+> ip route { add | delete | change | ~~append~~ | replace } ROUTE
 >
 > ROUTE := NODE_SPEC [ INFO_SPEC ]
 >
@@ -244,53 +356,12 @@ Delete route:
 ip route del 192.168.22.0/24
 ```
 
-### `ip route show`: list routes
-
-Implemented syntax:
-
-> ip route [ show [ SELECTOR ] ]
->
-> SELECTOR := [ ~~root PREFIX~~ ] [ ~~match PREFIX~~ ] [ ~~exact PREFIX~~ ]
->             [ ~~table TABLE_ID~~ ] [ ~~vrf NAME~~ ] [ proto RTPROTO ]
->             [ type TYPE ] [ scope SCOPE ]
->
-> TYPE := { unicast | ~~local~~ | broadcast | multicast | ~~throw~~ |
->           ~~unreachable~~ | ~~prohibit~~ | blackhole | ~~nat~~ }
->
-> ~~TABLE_ID := [ local | main | default | all | NUMBER ]~~
->
-> SCOPE := [ host | link | global | ~~NUMBER~~ ]
->
-> RTPROTO := [ kernel | ~~boot~~ | static | ~~NUMBER~~ ]
-
-List routes using a specific gateway:
-
-```shell
-ip route show via 192.168.0.1
-```
-
-List routes using a specific network interface:
-
-```shell
-ip route show dev en1
-```
-
-List routes for multicast:
-
-```shell
-ip route show type multicast
-```
-
-#### Notes
-
-1. `iif` is not honored (is treated like `dev` and `oif`).
-2. *Route tables* are not implemented in macOS (Darwin).
-
 ### `ip route get`: get a single route
 
 Implemented syntax:
 
 > ip route get ~~ROUTE_GET_FLAGS~~ ADDRESS [ ~~from ADDRESS iif STRING~~  ] [ ~~oif STRING~~ ] [ ~~mark MARK~~ ] [ ~~tos TOS~~ ] [ ~~vrf NAME~~ ] [ ~~ipproto PROTOCOL~~ ] [ ~~sport NUMBER~~ ] [ ~~dport NUMBER~~ ]
+>
 > ROUTE_GET_FLAGS :=  [ fibmatch ]
 
 Shows the route to reach Google DNS 8.8.8.8:
@@ -333,7 +404,7 @@ Then install requiered packages:
 
 ```shell
 python3 -m pip install -U pip
-python3 -m pip install pre-commit pytest flake8
+python3 -m pip install pre-commit pytest
 pre-commit install
 ```
 

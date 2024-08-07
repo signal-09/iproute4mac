@@ -1,5 +1,3 @@
-import re
-
 from iproute4mac.utils import *
 
 
@@ -57,13 +55,13 @@ def exec(*argv):
     return shell("route", *argv)
 
 
-def dumps(routes, option):
-    if option["json"]:
-        print(json_dumps(routes, option["pretty"]))
+def dumps(routes):
+    if OPTION["json"]:
+        print(json_dumps(routes, OPTION["pretty"]))
         return
 
-    if not routes:
-        return
+    # if not routes:
+    #    return
 
     for route in routes:
         stdout(route["dst"])
@@ -102,25 +100,25 @@ class routeGetRegEx:
         self.data = self._data.match(line)
 
 
-def parse(res, option):
+def parse(res):
     route = {}
     for line in iter(res.split("\n")):
         match = routeGetRegEx(line)
 
         if match.dst:
-            route["dst"] = match.dst.group("dst")
+            route["dst"] = Prefix(match.dst.group("dst"))
         elif match.gateway:
-            route["gateway"] = match.gateway.group("gateway")
+            route["gateway"] = Prefix(match.gateway.group("gateway"))
         elif match.dev:
             route["dev"] = match.dev.group("dev")
         elif match.flags:
             try:
-                route["prefsrc"] = get_prefsrc(route["dst"], option["preferred_family"])
+                route["prefsrc"] = get_prefsrc(route["dst"], OPTION["preferred_family"])
             except Exception:
                 pass
             route["flags"] = match.flags.group("flags")
             route["flags"] = route["flags"].split(",") if route["flags"] != "" else []
-            route["uid"] = option["uid"]
+            route["uid"] = OPTION["uid"]
         elif match.data:
             data = match.data.groupdict()
             for key in data:
@@ -129,5 +127,7 @@ def parse(res, option):
             route["cache"] = []
             if data["expire"]:
                 route["cache"].append({"expire": data["expire"]})
+        else:
+            debug(f'Unparsed line "{line.strip()}"')
 
     return [route] if route else []

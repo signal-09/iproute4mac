@@ -1,3 +1,4 @@
+show-fixes = true
 line-length = 128
 
 [lint]

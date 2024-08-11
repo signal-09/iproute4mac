@@ -1,9 +1,10 @@
 from iproute4mac.utils import *
+from iproute4mac.ipaddress import get_ifconfig_links
 
 
-"""
-https://docs.freebsd.org/en/books/handbook/advanced-networking/#routeflags
-"""
+_NETSTAT = "netstat"
+
+# https://docs.freebsd.org/en/books/handbook/advanced-networking/#routeflags
 RTF_PROTO1 = "1"  # Protocol specific routing flag #1
 RTF_PROTO2 = "2"  # Protocol specific routing flag #2
 RTF_PROTO3 = "3"  # Protocol specific routing flag #3
@@ -29,8 +30,8 @@ RTF_PROXY = "Y"  # Proxying; cloned routes will not be scoped
 RTF_GLOBAL = "g"  # Route to a destination of the global internet (policy hint)
 
 
-def exec(*argv):
-    return shell("netstat", *argv)
+def exec(*argv, cmd=_NETSTAT, fatal=True):
+    return shell(cmd, *argv, fatal=fatal)
 
 
 def dumps(routes):
@@ -44,9 +45,9 @@ def dumps(routes):
     for route in routes:
         if OPTION["show_details"] or "type" in route:
             stdout(route["type"] if "type" in route else "unicast", " ")
-        stdout(route["dst"])
+        stdout(str(route["dst"]))
         if "gateway" in route:
-            stdout(f" via {route['gateway']}")
+            stdout(f" via {repr(route['gateway'])}")
         if "dev" in route:
             stdout(f" dev {route['dev']}")
         if "protocol" in route:
@@ -54,7 +55,7 @@ def dumps(routes):
         if "scope" in route:
             stdout(f" scope {route['scope']}")
         if "prefsrc" in route:
-            stdout(f" src {route['src']}")
+            stdout(f" src {route['prefsrc']}")
         stdout(end="\n")
 
 
@@ -72,6 +73,11 @@ class netstatRegEx:
 
 
 def parse(res):
+    # hide unrequested (but needed) system command from logs
+    old_options = options_override({"quiet": True, "show_details": True, "verbose": 0})
+    links = get_ifconfig_links([])
+    options_restore(old_options)
+
     routes = []
     for line in iter(res.split("\n")):
         match = netstatRegEx(line)
@@ -135,6 +141,9 @@ def parse(res):
             else:
                 addr_type = None
 
+            addr_info = next((link["addr_info"] for link in links if link["ifname"] == dev and "addr_info" in link), [])
+            src = next((addr["local"] for addr in addr_info if "local" in addr and addr["local"] in dst), None)
+
             route = {
                 "type": addr_type,
                 "dst": dst,
@@ -143,6 +152,7 @@ def parse(res):
                 "protocol": protocol,
                 "scope": scope,
                 "expire": int(expire) if expire and expire.isdigit() else None,
+                "prefsrc": src,
                 "flags": [],
             }
             routes.append({k: v for k, v in route.items() if v is not None})

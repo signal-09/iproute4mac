@@ -1,6 +1,8 @@
 from iproute4mac.utils import *
 
 
+_ROUTE = "route"
+
 ROUTE_DUMP_MAGIC = 0x45311224
 
 RTN_UNSPEC = 0
@@ -51,8 +53,8 @@ def is_rtn(name):
     return True
 
 
-def exec(*argv):
-    return shell("route", *argv)
+def exec(*argv, cmd=_ROUTE, fatal=True):
+    return shell(cmd, *argv, fatal=fatal)
 
 
 def dumps(routes):
@@ -60,11 +62,8 @@ def dumps(routes):
         print(json_dumps(routes, OPTION["pretty"]))
         return
 
-    # if not routes:
-    #    return
-
     for route in routes:
-        stdout(route["dst"])
+        stdout(repr(route["dst"]))
         if "gateway" in route:
             stdout(f" via {route['gateway']}")
         if "dev" in route:
@@ -77,7 +76,7 @@ def dumps(routes):
 
 
 class routeGetRegEx:
-    _dst = re.compile(rf"\s+route to: (?P<dst>{IPV4ADDR}|{IPV6ADDR})")
+    _dst = re.compile(rf"\s+route to: (?P<dst>default|{IPV4ADDR}|{IPV6ADDR})")
     _gateway = re.compile(rf"\s+gateway: (?P<gateway>default|{IPV4ADDR}|{IPV6ADDR})")
     _dev = re.compile(r"\s+interface: (?P<dev>\w+)")
     _flags = re.compile(r"\s+flags: <(?P<flags>.*)>")
@@ -107,13 +106,19 @@ def parse(res):
 
         if match.dst:
             route["dst"] = Prefix(match.dst.group("dst"))
+            if route["dst"].family == AF_UNSPEC:
+                route["dst"].family = (
+                    socket.AF_INET6 if ":" in repr(route["dst"]) or OPTION["preferred_family"] == AF_INET6 else socket.AF_INET
+                )
+            if not route["dst"].is_host:
+                route["dst"] = Prefix(str(route["dst"].address))
         elif match.gateway:
             route["gateway"] = Prefix(match.gateway.group("gateway"))
         elif match.dev:
             route["dev"] = match.dev.group("dev")
         elif match.flags:
             try:
-                route["prefsrc"] = get_prefsrc(route["dst"], OPTION["preferred_family"])
+                route["prefsrc"] = get_prefsrc(route["dst"])
             except Exception:
                 pass
             route["flags"] = match.flags.group("flags")

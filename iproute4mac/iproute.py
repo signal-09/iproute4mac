@@ -433,13 +433,12 @@ def iproute_get(argv):
             if matches(opt, "help"):
                 usage()
             prefix = get_prefix(opt, OPTION["preferred_family"])
-            if not prefix.is_host:
+            if "/" in str(prefix) and not prefix.is_host:
                 stderr(
                     "Warning: "
                     f"/{prefix.prefixlen} as prefix is invalid, "
-                    f"only /{prefix._max_prefixlen} (or none) is supported."
+                    f"only /{prefix.max_prefixlen} (or none) is supported."
                 )
-                prefix = Prefix(str(prefix.address))
 
     if not prefix:
         stderr("need at least a destination address")
@@ -449,7 +448,7 @@ def iproute_get(argv):
     if prefix.family == AF_INET6 or OPTION["preferred_family"] == AF_INET6:
         argv += ["-inet6"]
 
-    res = route.exec(argv, str(prefix))
+    res = route.exec(argv, repr(prefix))
     get = route.parse(res)
     route.dumps(get)
 
@@ -481,7 +480,8 @@ def iproute_list(argv):
                 invarg('invalid "protocol"', protocol)
             if protocol == "all":
                 continue
-            entries = [entry for entry in entries if "protocol" in entry and entry["protocol"] == protocol]
+            entries = [entry for entry in entries if "protocol" in entry and entry.get("protocol") == protocol]
+            delete_keys(entries, "protocol")
         elif matches(opt, "scope"):
             scope = next_arg(argv)
             if scope not in ("link", "host", "global", "all") and not scope.isdigit():
@@ -489,7 +489,7 @@ def iproute_list(argv):
             if scope == "all":
                 continue
             # FIXME: numeric scope?
-            entries = [entry for entry in entries if "scope" in entry and entry["scope"] == scope]
+            entries = [entry for entry in entries if "scope" in entry and entry.get("scope") == scope]
             delete_keys(entries, "scope")
         elif matches(opt, "type"):
             rt = next_arg(argv)

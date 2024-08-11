@@ -13,6 +13,8 @@ This is a macOS network wrapper to imitate GNU/Linux [iproute2](https://wiki.lin
 * `ip route [ list | show ]`
 * `ip route { add | change | replace | delete }`
 * `ip route get`
+* `ip neigh [ list | show ]`
+* `ip neigh flush`
 
 ## Installation
 
@@ -369,6 +371,16 @@ Shows the route to reach Google DNS 8.8.8.8:
 ```shell
 ip route get 8.8.8.8
 ```
+
+### `ip neigh show`: list neighbour entries
+
+#### Notes
+
+1. NOARP and PERMANENT states are not catched
+
+### `ip neigh flush`: flush neighbour entries
+
+Same syntax of `ip neigh show`
 
 ## Contributing
 

@@ -3,12 +3,14 @@ import iproute4mac.libc as libc
 from iproute4mac.utils import *
 
 
+_IFCONFIG = "ifconfig"
+
 RXQLEN = "net.link.generic.system.rcvq_maxlen"
 TXQLEN = "net.link.generic.system.sndq_maxlen"
 
 
-def exec(*argv, fatal=True):
-    return shell("ifconfig", *argv, fatal=fatal)
+def exec(*argv, cmd=_IFCONFIG, fatal=True):
+    return shell(cmd, *argv, fatal=fatal)
 
 
 def dumps(links):

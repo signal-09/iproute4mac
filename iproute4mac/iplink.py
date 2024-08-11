@@ -161,9 +161,13 @@ def iplink_set(dev, link_type, args, links):
 
 
 def iplink_modify(cmd, argv):
+    # hide unrequested (but needed) system command from logs
+    old_options = options_override({"quiet": True, "show_details": True, "verbose": 0})
+    links = get_iplinks()
+    options_restore(old_options)
+
     dev = None
     link_type = None
-    links = get_iplinks(quiet=True, details=True)
     modifiers = {}
     while argv:
         opt = argv.pop(0)
@@ -421,18 +425,8 @@ def iplink_modify(cmd, argv):
     return EXIT_SUCCESS
 
 
-def get_iplinks(argv=[], quiet=False, details=False):
-    if quiet != OPTION["quiet"]:
-        OPTION["quiet"] = quiet
-        quiet = not quiet
-    if details != OPTION["show_details"]:
-        OPTION["show_details"] = details
-        details = not details
+def get_iplinks(argv=[]):
     links = get_ifconfig_links(argv, usage)
-    if quiet != OPTION["quiet"]:
-        OPTION["quiet"] = quiet
-    if details != OPTION["show_details"]:
-        OPTION["show_details"] = details
     delete_keys(links, "addr_info")
     return links
 

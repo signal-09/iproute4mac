@@ -251,9 +251,11 @@ class PrettyJSON(json.JSONEncoder):
         return json_repr
 
 
-def flat_touple(*argv):
+def flat_tuple(*argv):
     args = ()
     for arg in argv:
+        if arg is None:
+            continue
         if isinstance(arg, list):
             args += tuple(arg)
         elif isinstance(arg, tuple):
@@ -264,22 +266,22 @@ def flat_touple(*argv):
 
 
 def strcmp(opt, *argv):
-    args = flat_touple(*argv)
+    args = flat_tuple(*argv)
     return any(arg == opt for arg in args)
 
 
 def matches(opt, *argv):
-    args = flat_touple(*argv)
+    args = flat_tuple(*argv)
     return any(arg.startswith(opt) for arg in args)
 
 
 def startwith(opt, *argv):
-    args = flat_touple(*argv)
+    args = flat_tuple(*argv)
     return any(opt.startswith(arg) for arg in args)
 
 
 def endwith(opt, *argv):
-    args = flat_touple(*argv)
+    args = flat_tuple(*argv)
     return any(opt.endswith(arg) for arg in args)
 
 
@@ -314,8 +316,18 @@ def do_notimplemented(argv=[]):
         error("function not implemented")
 
 
-def shell(*argv, fatal=True, hidden=False):
-    args = flat_touple(*argv)
+def options_override(options={}):
+    for key, value in options.items():
+        OPTION[key], options[key] = value, OPTION[key]
+    return options
+
+
+def options_restore(options={}):
+    OPTION.update(options)
+
+
+def shell(*argv, fatal=True):
+    args = flat_tuple(*argv)
     info('executing "' + " ".join(args) + '"')
     cmd = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
     if cmd.returncode != 0:
@@ -334,22 +346,9 @@ def shell(*argv, fatal=True, hidden=False):
 def get_addr(name, family):
     if family == AF_MPLS:
         error("MPLS protocol not supported.")
-    elif strcmp(name, "default"):
-        if family == AF_INET:
-            return Prefix("0.0.0.0/0")
-        if family == AF_INET6:
-            return Prefix("::/0")
-        return Prefix("default")
-    elif strcmp(name, "any", "all"):
-        if family == AF_INET:
-            return Prefix("0.0.0.0")
-        if family == AF_INET6:
-            return Prefix("::")
-        return Prefix("any")
-    else:
-        addr = Prefix(name)
-        if family in (AF_UNSPEC, AF_PACKET) or addr.family == family:
-            return addr
+    addr = Prefix(name, family=family)
+    if family in (AF_UNSPEC, AF_PACKET) or addr.family == family:
+        return addr
 
     error(f'{family_name_verbose(family)} address is expected rather than "{name}".')
 
@@ -366,10 +365,9 @@ def get_prefix(name, family):
     return prefix
 
 
-def get_prefsrc(host, family):
-    family = socket.AF_INET6 if ":" in host or family == AF_INET6 else socket.AF_INET
-    sock = socket.socket(family, socket.SOCK_DGRAM)
-    sock.connect((host, 7))
+def get_prefsrc(host):
+    sock = socket.socket(host.family, socket.SOCK_DGRAM)
+    sock.connect((repr(host), 7))
     src = sock.getsockname()[0]
     sock.close()
     return src

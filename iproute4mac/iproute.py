@@ -522,7 +522,7 @@ def iproute_list(argv):
             else:
                 via = next_arg(argv)
             prefix = get_prefix(via, family)
-            entries = [entry for entry in entries if "gateway" in entry and prefix in Prefix(entry["gateway"])]
+            entries = [entry for entry in entries if "gateway" in entry and prefix in entry["gateway"]]
             delete_keys(entries, "gateway")
         elif strcmp(opt, "src"):
             src = next_arg(argv)

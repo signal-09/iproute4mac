@@ -53,6 +53,7 @@ def ipneigh_modify(cmd, argv):
             do_notimplemented([opt])
         elif strcmp(opt, "dev"):
             dev = next_arg(argv)
+            do_notimplemented([opt, dev])
         elif matches(opt, "protocol"):
             do_notimplemented([opt])
         else:
@@ -79,8 +80,39 @@ def ipneigh_modify(cmd, argv):
 
 
 def ipneigh_get(argv):
+    res = nud.exec("-n", "-l", "-a")
+    entries = nud.parse(res)
+    dev = None
+    dst = None
     while argv:
         opt = argv.pop(0)
+        if strcmp(opt, "dev"):
+            opt = next_arg(argv)
+            if dev:
+                duparg("dev", opt)
+            dev = opt
+            entries = [entry for entry in entries if entry.get("dev") == dev]
+        elif strcmp(opt, "proxy"):
+            entries = [entry for entry in entries if "proxy" in entry["state"]]
+        else:
+            if strcmp(opt, "to"):
+                opt = next_arg(argv)
+            if matches(opt, "help"):
+                usage()
+            if dst:
+                duparg2("to", opt)
+            try:
+                dst = get_addr(opt, OPTION["preferred_family"])
+            except ValueError:
+                invarg("to value is invalid", opt)
+            entries = [entry for entry in entries if entry["dst"] in dst]
+
+    if not dev or not dst:
+        stderr("Device and address are required arguments.")
+        return EXIT_FAILURE
+
+    OPTION["json"] = False
+    nud.dumps(entries)
 
     return EXIT_SUCCESS
 

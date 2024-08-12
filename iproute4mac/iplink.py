@@ -278,8 +278,8 @@ def iplink_modify(cmd, argv):
             if not any(link["ifname"] == vrf for link in links):
                 invarg("Not a valid VRF name", vrf)
             # if not is_vrf(vrf):
-            #     invarg('Not a valid VRF name', vrf)
-            # links = [link for link in links if ('master' in link and link['master'] == vrf)]
+            #     invarg("Not a valid VRF name", vrf)
+            # links = [link for link in links if link.get("master") == vrf)]
             # FIXME: https://wiki.netunix.net/freebsd/network/vrf/
             do_notimplemented([opt])
         elif matches(opt, "nomaster"):
@@ -432,6 +432,7 @@ def get_iplinks(argv=[]):
 
 
 def iplink_list(argv):
+    OPTION["preferred_family"] = AF_PACKET
     ifconfig.dumps(get_iplinks(argv))
     return EXIT_SUCCESS
 

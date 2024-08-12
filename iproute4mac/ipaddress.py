@@ -3,6 +3,23 @@ import iproute4mac.ifconfig as ifconfig
 from iproute4mac.utils import *
 
 
+FLAG_MASK = [
+    "secondary",
+    "temporary",
+    "nodad",
+    "optimistic",
+    "dadfailed",
+    "home",
+    "deprecated",
+    "tentative",
+    "permanent",
+    "mngtmpaddr",
+    "noprefixroute",
+    "autojoin",
+    "stable-privacy",
+]
+
+
 def usage():
     stderr("""\
 Usage: ip address {add|change|replace} IFADDR dev IFNAME [ LIFETIME ]
@@ -41,44 +58,162 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
     exit(-1)
 
 
+def ipaddr_add(dev, local, broadcast):
+    args = ()
+    if local:
+        address = str(local)
+        proto = "inet" if local.version == 4 else "inet6"
+    else:
+        address = None
+        proto = None
+    if broadcast:
+        if not local or local.family != AF_INET:
+            stderr("Broadcast can be set only for IPv4 addresses")
+            exit(EXIT_FAILURE)
+        if broadcast == "+":
+            broadcast = str(local._network.broadcast_address)
+        elif broadcast == "-":
+            broadcast = str(local._network.network_address)
+        else:
+            broadcast = str(broadcast)
+        args += ("broadcast", broadcast)
+
+    if res := ifconfig.exec(dev, proto, address, args, "alias"):
+        stdout(res, optional=True)
+
+
+def ipaddr_del(dev, local):
+    if local:
+        address = str(local)
+        proto = "inet" if local.version == 4 else "inet6"
+    else:
+        address = None
+        proto = None
+
+    if res := ifconfig.exec(dev, proto, address, "-alias"):
+        stdout(res, optional=True)
+
+
+def ipaddr_modify(cmd, argv):
+    dev = None
+    local = None
+    peer = None
+    broadcast = None
+    anycast = None
+    while argv:
+        opt = argv.pop(0)
+        if strcmp(opt, "peer", "remote"):
+            opt = next_arg(argv)
+            if peer:
+                duparg("peer", opt)
+            peer = get_prefix(opt, OPTION["preferred_family"])
+            OPTION["preferred_family"] = peer.family
+        elif matches(opt, "broadcast") or strcmp(opt, "brd"):
+            opt = next_arg(argv)
+            if broadcast:
+                duparg("broadcast", opt)
+            if strcmp(opt, "+", "-"):
+                broadcast = opt
+            else:
+                broadcast = get_addr(opt, OPTION["preferred_family"])
+                OPTION["preferred_family"] = broadcast.family
+        elif strcmp(opt, "anycast"):
+            opt = next_arg(argv)
+            if anycast:
+                duparg("anycast", opt)
+            anycast = get_addr(opt, OPTION["preferred_family"])
+            # FIXME: anycast is supported by ifconfig
+            do_notimplemented([opt])
+        elif strcmp(opt, "scope"):
+            do_notimplemented([opt])
+        elif strcmp(opt, "dev"):
+            dev = next_arg(argv)
+        elif strcmp(opt, "label"):
+            do_notimplemented([opt])
+        elif matches(opt, "metric", "priority", "preference"):
+            metric = next_arg(argv)
+            try:
+                assert 0 <= int(metric) < 2**32
+            except (ValueError, AssertionError):
+                invarg('"metric" value is invalid', metric)
+            do_notimplemented([opt])
+        elif matches(opt, "valid_lft"):
+            lft = next_arg(argv)
+            hint(f'try "sysctl -w net.inet6.ip6.tempvltime={lft}" instead.')
+            do_notimplemented([opt])
+        elif matches(opt, "preferred_lft"):
+            lft = next_arg(argv)
+            hint(f'try "sysctl -w net.inet6.ip6.temppltime={lft}" instead.')
+            do_notimplemented([opt])
+        elif strcmp(opt, FLAG_MASK):
+            do_notimplemented([opt])
+        else:
+            if strcmp(opt, "local"):
+                opt = next_arg(argv)
+            if matches(opt, "help"):
+                usage()
+            if local:
+                duparg2("local", opt)
+            local = get_prefix(opt, OPTION["preferred_family"])
+            if "/" not in opt:
+                local = Prefix(f"{opt}/{local.max_prefixlen}")
+            OPTION["preferred_family"] = local.family
+
+    if not dev:
+        stderr('Not enough information: "dev" argument is required.')
+        return EXIT_FAILURE
+
+    if matches(cmd, "add", "change", "replace") or strcmp(cmd, "chg"):
+        ipaddr_add(dev, local, broadcast)
+    elif matches(cmd, "delete"):
+        ipaddr_del(dev, local)
+    else:
+        do_notimplemented()
+
+    return EXIT_SUCCESS
+
+
 def get_ifconfig_links(argv, usage=usage):
     res = ifconfig.exec("-v", "-L", "-a")
     links = ifconfig.parse(res)
+    ref_links = list(links)
+    dev = None
     while argv:
         opt = argv.pop(0)
         if strcmp(opt, "to"):
-            # to = next_arg(argv)
-            # get_prefix(to, OPTION["preferred_family"])
-            do_notimplemented()
+            prefix = get_prefix(next_arg(argv), OPTION["preferred_family"])
+            if prefix.family != AF_UNSPEC:
+                OPTION["preferred_family"] = prefix.family
+            for link in links:
+                link["addr_info"] = [addr for addr in link.get("addr_info", []) if addr["local"] in prefix]
+            links = [link for link in links if link["addr_info"]]
         elif strcmp(opt, "scope"):
             scope = next_arg(argv)
             if scope not in ("link", "host", "global", "all") and not scope.isdigit():
                 invarg('invalid "scope"', scope)
             if scope == "all":
                 continue
-            do_notimplemented()
+            for link in links:
+                link["addr_info"] = [addr for addr in link.get("addr_info", []) if addr["scope"] == scope]
+            links = [link for link in links if link["addr_info"]]
         elif strcmp(opt, "up"):
             links = [link for link in links if ("flags" in link and "UP" in link["flags"])]
-        # TODO: elif get_filter(opt):
         elif strcmp(opt, "label"):
-            # label = next_opt(argv)
-            do_notimplemented()
+            do_notimplemented([opt])
         elif strcmp(opt, "group"):
-            group = next_arg(argv)
-            do_notimplemented()
-            invarg('Invalid "group" value', group)
+            do_notimplemented([opt])
         elif strcmp(opt, "master"):
             master = next_arg(argv)
-            if not any(link["ifname"] == master for link in links):
+            if not any(link["ifname"] == master for link in ref_links):
                 invarg("Device does not exist", master)
-            links = [link for link in links if ("master" in link and link["master"] == master)]
+            links = [link for link in links if link.get("master") == master]
         elif strcmp(opt, "vrf"):
             vrf = next_arg(argv)
-            if not any(link["ifname"] == vrf for link in links):
+            if not any(link["ifname"] == vrf for link in ref_links):
                 invarg("Not a valid VRF name", vrf)
             # if not is_vrf(vrf):
-            #     invarg('Not a valid VRF name', vrf)
-            # links = [link for link in links if ('master' in link and link['master'] == vrf)]
+            #     invarg("Not a valid VRF name", vrf)
+            # links = [link for link in links if link.get("master") == vrf]
             # FIXME: https://wiki.netunix.net/freebsd/network/vrf/
             do_notimplemented([opt])
         elif strcmp(opt, "nomaster"):
@@ -95,10 +230,13 @@ def get_ifconfig_links(argv, usage=usage):
                 opt = next_arg(argv)
             elif matches(opt, "help"):
                 usage()
-            links = [link for link in links if link["ifname"] == opt]
-            if not links:
+            if dev:
+                duparg2("dev", opt)
+            if not any(link["ifname"] == opt for link in ref_links):
                 stderr(f'Device "{opt}" does not exist.')
                 exit(-1)
+            dev = opt
+            links = [link for link in links if link["ifname"] == dev]
 
     if not OPTION["show_details"]:
         delete_keys(links, "linkinfo")
@@ -106,33 +244,41 @@ def get_ifconfig_links(argv, usage=usage):
     return links
 
 
-def ipaddr_list(argv):
+def ipaddr_list_or_flush(argv, flush=False):
+    if flush:
+        if not argv:
+            stderr("Flush requires arguments.")
+            exit(-1)
+        if OPTION["preferred_family"] == AF_PACKET:
+            stderr("Cannot flush link addresses.")
+            exit(-1)
+
     links = get_ifconfig_links(argv)
     if OPTION["preferred_family"] in (AF_INET, AF_INET6, AF_MPLS, AF_BRIDGE):
         family = family_name(OPTION["preferred_family"])
-        links = [link for link in links if "addr_info" in link and any(addr["family"] == family for addr in link["addr_info"])]
-    ifconfig.dumps(links)
+        links = [link for link in links if any(addr["family"] == family for addr in link.get("addr_info", []))]
+
+    if flush:
+        for link in links:
+            for addr in link["addr_info"]:
+                ifconfig.exec(link["ifname"], addr["family"], addr["local"], "-alias")
+    else:
+        ifconfig.dumps(links)
 
     return EXIT_SUCCESS
 
 
 def do_ipaddr(argv):
     if not argv:
-        return ipaddr_list(argv)
+        return ipaddr_list_or_flush(argv)
 
     cmd = argv.pop(0)
-    if matches(cmd, "add"):
-        return do_notimplemented()
-    elif matches(cmd, "change", "chg"):
-        return do_notimplemented()
-    elif matches(cmd, "replace"):
-        return do_notimplemented()
-    elif matches(cmd, "delete"):
-        return do_notimplemented()
+    if matches(cmd, "add", "change", "replace", "delete") or strcmp(cmd, "chg"):
+        return ipaddr_modify(cmd, argv)
     elif matches(cmd, "show", "lst", "list"):
-        return ipaddr_list(argv)
+        return ipaddr_list_or_flush(argv)
     elif matches(cmd, "flush"):
-        return do_notimplemented()
+        return ipaddr_list_or_flush(argv, flush=True)
     elif matches(cmd, "save"):
         return do_notimplemented()
     elif matches(cmd, "showdump"):

@@ -309,13 +309,6 @@ def deep_update(source, update):
         source[key] = value
 
 
-def do_notimplemented(argv=[]):
-    if argv:
-        error('"' + " ".join(argv) + '" not implemented')
-    else:
-        error("function not implemented")
-
-
 def options_override(options={}):
     for key, value in options.items():
         OPTION[key], options[key] = value, OPTION[key]
@@ -371,3 +364,10 @@ def get_prefsrc(host):
     src = sock.getsockname()[0]
     sock.close()
     return src
+
+
+def do_notimplemented(argv=[]):
+    if argv:
+        error('"' + " ".join(argv) + '" not implemented')
+    else:
+        error("function not implemented")

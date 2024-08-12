@@ -8,6 +8,7 @@ This is a macOS network wrapper to imitate GNU/Linux [iproute2](https://wiki.lin
 ### Working staff
 
 * `ip address [ list | show ]`
+* `ip address { add | change | replace | delete }`
 * `ip link [ list | show ]`
 * `ip link { add | set | change | delete }`
 * `ip route [ list | show ]`
@@ -116,10 +117,33 @@ Shows IPv4 only addresses assigned to networks member of bridge0:
 ip -4 address show master bridge0
 ```
 
+Shows IP addresses belonging to private C class network 192.168.0.0/24:
+
+```shell
+ip address show to 192.168.0.0/24
+```
+
 #### Notes
 
 1. `qdisc` (queuing discipline) is part of the Linux Traffic Control subsystem (TC) managed via the `tc` utility. Even if this information is not reported, similar results in traffic control and shaping can be achieved using `dnctl` and `pfctl`.
 2. `address lifetime` for IPv6 addresses (-L flag of `ifconfig`) is not provided anymore in Sonoma (macOS 14); for IPv4, addresses *valid* and *prederred* lifetime, is supposed *forever* (0xffffffff = 4.294.967.295 = 32 bit).
+3. `sysctl net.inet6.ip6.temppltime` specifies the "preferred lifetime" for privacy addresses, in seconds, and defaults to 86400 (one day).
+4. `sysctl net.inet6.ip6.tempvltime` specifies the "valid lifetime" for privacy addresses, in second, and defaults to 604800 (one week).
+
+### `ip address add`: add new protocol address
+### `ip address change`: change protocol address
+### `ip address replace`: change or add protocol address
+
+Implemented syntax:
+
+> ip address {add|change|replace} IFADDR dev IFNAME [ LIFETIME ]
+>                                                   [ CONFFLAG-LIST ]
+
+#### Notes
+
+1. `{change|replace}` option "really" change address properties (e.g. broadcast) while Linux simply ignore them.
+
+### `ip address delete`: delete protocol address
 
 ### `ip link show`: display device attributes
 

@@ -131,19 +131,24 @@ def parse(argv, args):
 
 
 def add(dev, args):
-    return ifconfig.exec(dev, "create")
+    if res := ifconfig.run(dev, "create"):
+        stdout(res, optional=True)
 
 
 def set(dev, args):
-    return ""
+    pass
 
 
-def link(dev, master):
-    ifconfig.exec(master, "addm", dev)
+def delete(link, args):
+    ifconfig.run(link["ifname"], "destroy")
 
 
-def free(dev, master):
-    ifconfig.exec(master, "deletem", dev)
+def link(link, master):
+    ifconfig.run(str(master["ifname"]), "addm", str(link["ifname"]))
+
+
+def free(link, master):
+    ifconfig.run(str(master["ifname"]), "deletem", str(link["ifname"]))
 
 
 def dump(argv, links):

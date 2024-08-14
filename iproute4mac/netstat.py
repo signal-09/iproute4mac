@@ -30,7 +30,7 @@ RTF_PROXY = "Y"  # Proxying; cloned routes will not be scoped
 RTF_GLOBAL = "g"  # Route to a destination of the global internet (policy hint)
 
 
-def exec(*argv, cmd=_NETSTAT, fatal=True):
+def run(*argv, cmd=_NETSTAT, fatal=True):
     return shell(cmd, *argv, fatal=fatal)
 
 
@@ -141,8 +141,8 @@ def parse(res):
             else:
                 addr_type = None
 
-            addr_info = next((link["addr_info"] for link in links if link["ifname"] == dev and "addr_info" in link), [])
-            src = next((addr["local"] for addr in addr_info if "local" in addr and addr["local"] in dst), None)
+            addr_info = next((l["addr_info"] for l in links if l["ifname"] == dev and "addr_info" in l), [])
+            src = next((a["local"] for a in addr_info if a.get("local") in dst), None)
 
             route = {
                 "type": addr_type,

@@ -1,5 +1,6 @@
 from iproute4mac.utils import *
 
+
 _ARP = "arp"
 _NDP = "ndp"
 
@@ -79,7 +80,7 @@ def from_desc(value):
     raise ValueError
 
 
-def exec(*argv, cmd=None):
+def run(*argv, cmd=None):
     res = ""
     if not cmd and OPTION["preferred_family"] != AF_INET6:
         res += shell(_ARP, *argv)
@@ -92,9 +93,9 @@ def exec(*argv, cmd=None):
 
 def delete(host, dev=None):
     if host.family == AF_INET:
-        exec("-d", str(host), "ifscope" if dev else None, dev, cmd=_ARP)
+        run("-d", str(host), "ifscope" if dev else None, dev, cmd=_ARP)
     else:
-        exec("-d", f"{host}%{dev}" if dev else str(host), cmd=_NDP)
+        run("-d", f"{host}%{dev}" if dev else str(host), cmd=_NDP)
 
 
 def dumps(entries):

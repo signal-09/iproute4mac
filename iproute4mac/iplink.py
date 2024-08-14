@@ -1,5 +1,6 @@
 import iproute4mac.ifconfig as ifconfig
 import iproute4mac.iplink_vlan as vlan
+import iproute4mac.iplink_feth as feth
 import iproute4mac.iplink_bridge as bridge
 import iproute4mac.iplink_bond as bond
 
@@ -78,7 +79,7 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
           ipip | ipoib | ipvlan | ipvtap |
           macsec | macvlan | macvtap | netdevsim |
           netkit | nlmon | pfcp | rmnet | sit | team | team_slave |
-          vcan | veth | vlan | vrf | vti | vxcan | vxlan | wwan |
+          vcan | feth | vlan | vrf | vti | vxcan | vxlan | wwan |
           xfrm | virt_wifi }""")
     exit(-1)
 
@@ -101,10 +102,13 @@ class LinkType:
         self._module.parse(argv, args)
 
     def add(self, argv, links):
-        return self._module.add(argv, links)
+        self._module.add(argv, links)
+
+    def delete(self, argv, links):
+        self._module.delete(argv, links)
 
     def set(self, argv, links):
-        return self._module.set(argv, links)
+        self._module.set(argv, links)
 
     def link(self, argv, links):
         self._module.link(argv, links)
@@ -117,47 +121,58 @@ class LinkType:
 
 
 def iplink_add(dev, link_type, args, links):
-    if res := link_type.add(dev, args):
-        stdout(res, optional=True)
-    iplink_set(dev, link_type, args, links)
+    link_type.add(dev, args)
 
 
 def iplink_del(dev, link_type, args, links):
-    if res := ifconfig.exec(dev, "destroy"):
+    if not (link := next((l for l in links if l["ifname"] == dev), None)):
+        stderr(f'Cannot find device "{dev}"')
+        exit(1)
+
+    if not link_type:
+        if kind := link.get("linkinfo", {}).get("info_kind"):
+            link_type = LinkType(kind)
+    if link_type:
+        link_type.delete(link, args)
+    elif res := ifconfig.run(dev, "destroy"):
         stdout(res, optional=True)
 
 
 def iplink_set(dev, link_type, args, links):
+    if not (link := next((l for l in links if l["ifname"] == dev), None)):
+        stderr(f'Cannot find device "{dev}"')
+        exit(1)
+
     res = ""
     for opt, value in args.items():
         if strcmp(opt, "state"):
-            res += ifconfig.exec(dev, value)
+            res += ifconfig.run(dev, value)
         elif strcmp(opt, "arp"):
-            res += ifconfig.exec(dev, value)
+            res += ifconfig.run(dev, value)
         elif strcmp(opt, "mtu"):
-            res += ifconfig.exec(dev, "mtu", value)
+            res += ifconfig.run(dev, "mtu", value)
         elif strcmp(opt, "address"):
-            res += ifconfig.exec(dev, "lladdr", value)
+            res += ifconfig.run(dev, "lladdr", value)
         elif strcmp(opt, "master"):
-            if master := next((link for link in links if link["ifname"] == value), None):
+            if master := next((l for l in links if l["ifname"] == value), None):
                 if not link_type:
                     if not (kind := master.get("linkinfo", {}).get("info_kind")):
                         continue
                     link_type = LinkType(kind)
-                link_type.link(dev, value)
+                link_type.link(link, master)
         elif strcmp(opt, "nomaster"):
-            if slave := next((link for link in links if link["ifname"] == dev and "master" in link), None):
+            if master := next((l for l in links if l["ifname"] == link.get("master")), None):
                 if not link_type:
-                    if not (kind := slave.get("linkinfo", {}).get("info_slave_kind")):
+                    if not (kind := link.get("linkinfo", {}).get("info_slave_kind")):
                         continue
                     link_type = LinkType(kind)
-                link_type.free(dev, slave["master"])
-
-    if link_type:
-        res += link_type.set(dev, args)
+                link_type.free(link, master)
 
     if res:
         stdout(res, optional=True)
+
+    if link_type:
+        link_type.set(dev, args)
 
 
 def iplink_modify(cmd, argv):
@@ -193,7 +208,7 @@ def iplink_modify(cmd, argv):
             do_notimplemented([opt])
         elif matches(opt, "link"):
             opt = next_arg(argv)
-            if not any(link["ifname"] == opt for link in links):
+            if not any(l["ifname"] == opt for l in links):
                 invarg("Device does not exist", opt)
             modifiers["link"] = opt
         elif matches(opt, "address"):
@@ -270,16 +285,16 @@ def iplink_modify(cmd, argv):
             do_notimplemented([opt])
         elif matches(opt, "master"):
             opt = next_arg(argv)
-            if not any(link["ifname"] == opt for link in links):
+            if not any(l["ifname"] == opt for l in links):
                 invarg("Device does not exist", opt)
             modifiers["master"] = opt
         elif strcmp(opt, "vrf"):
             vrf = next_arg(argv)
-            if not any(link["ifname"] == vrf for link in links):
+            if not any(l["ifname"] == vrf for l in links):
                 invarg("Not a valid VRF name", vrf)
             # if not is_vrf(vrf):
             #     invarg("Not a valid VRF name", vrf)
-            # links = [link for link in links if link.get("master") == vrf)]
+            # links = [l for l in links if l.get("master") == vrf)]
             # FIXME: https://wiki.netunix.net/freebsd/network/vrf/
             do_notimplemented([opt])
         elif matches(opt, "nomaster"):

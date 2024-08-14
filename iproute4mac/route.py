@@ -53,7 +53,7 @@ def is_rtn(name):
     return True
 
 
-def exec(*argv, cmd=_ROUTE, fatal=True):
+def run(*argv, cmd=_ROUTE, fatal=True):
     return shell(cmd, *argv, fatal=fatal)
 
 

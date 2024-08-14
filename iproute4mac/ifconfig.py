@@ -9,7 +9,25 @@ RXQLEN = "net.link.generic.system.rcvq_maxlen"
 TXQLEN = "net.link.generic.system.sndq_maxlen"
 
 
-def exec(*argv, cmd=_IFCONFIG, fatal=True):
+def links_init():
+    links = []
+    for ifname in shell(_IFCONFIG, "-l").split():
+        links.append({"ifindex": 0, "ifname": ifname})
+    return links
+
+
+def find(links, ifname):
+    return next(l for l in links if l["ifname"] == ifname)
+
+
+def find_or_create(links, ifname):
+    if not (link := next((l for l in links if l["ifname"] == ifname), None)):
+        link = {"ifindex": 0, "ifname": ifname}
+        links.append(link)
+    return link
+
+
+def run(*argv, cmd=_IFCONFIG, fatal=True):
     return shell(cmd, *argv, fatal=fatal)
 
 
@@ -17,9 +35,6 @@ def dumps(links):
     if OPTION["json"]:
         print(json_dumps(links, OPTION["pretty"]))
         return
-
-    # if not links:
-    #    return
 
     for link in links:
         stdout(link["ifindex"], ": ", link["ifname"])
@@ -104,6 +119,7 @@ class ifconfigRegEx:
     )
     _state = re.compile(r"\s+status: (?P<state>\w+)")
     _vlan = re.compile(r"\s+vlan: (?P<vlanid>\d+) parent interface: (?P<parent><?\w+>?)")
+    _feth = re.compile(r"\s+peer: (?P<peer>\w+)")
     _bond = re.compile(r"\s+bond interfaces: (\w+(?: \w+)*)")
     _bridge = re.compile(r"\s+Configuration:")
 
@@ -115,6 +131,7 @@ class ifconfigRegEx:
         self.inet6 = self._inet6.match(line)
         self.state = self._state.match(line)
         self.vlan = self._vlan.match(line)
+        self.feth = self._feth.match(line)
         self.bond = self._bond.match(line)
         self.bridge = self._bridge.match(line)
 
@@ -172,13 +189,11 @@ def parse_bridge(lines, links, link):
             info_data["ipfilter"] = match.filter.group("filter") != "disabled"
         elif match.member:
             ifname = match.member.group("member")
-            slave = next((item for item in links if item["ifname"] == ifname), None)
-            if not slave:
-                slave = {"ifname": ifname}
-                links.append(slave)
+            slave = find(links, ifname)
             slave["master"] = link["ifname"]
             slave["linkinfo"] = {"info_slave_kind": "bridge"}
         elif match.cache:
+            link["linkinfo"].update({"info_data": info_data})
             link["linkinfo"].update({"info_data": info_data})
             break
         elif line:
@@ -187,7 +202,7 @@ def parse_bridge(lines, links, link):
 
 def parse(res):
     txqlen = libc.sysctl(TXQLEN)
-    links = []
+    links = links_init()
     lines = iter(res.split("\n"))
     while line := next(lines):
         match = ifconfigRegEx(line)
@@ -195,15 +210,17 @@ def parse(res):
         if match.header:
             header = match.header.groupdict()
             debug(f"Found interface {header}")
-            link = {
-                "ifindex": int(header["ifindex"]),
-                "ifname": header["ifname"],
-                "flags": header["flags"].split(",") if header["flags"] != "" else [],
-                "mtu": int(header["mtu"]),
-                "operstate": "UNKNOWN",
-                "txqlen": txqlen,
-                "link_type": "none",
-            }
+            link = find(links, header["ifname"])
+            link.update(
+                {
+                    "ifindex": int(header["ifindex"]),
+                    "flags": header["flags"].split(",") if header["flags"] != "" else [],
+                    "mtu": int(header["mtu"]),
+                    "operstate": "UNKNOWN",
+                    "txqlen": txqlen,
+                    "link_type": "none",
+                }
+            )
 
             if "LOOPBACK" in link["flags"]:
                 link["link_type"] = "loopback"
@@ -212,12 +229,10 @@ def parse(res):
             elif "POINTOPOINT" in link["flags"]:
                 link["link_pointtopoint"] = True
 
-            if startwith(link["ifname"], "bridge", "bond", "vlan"):
-                link["linkinfo"] = {"info_kind": re.sub("[0-9]+", "", link["ifname"])}
+            if startwith(link["ifname"], "bridge", "bond", "feth", "vlan"):
+                link["linkinfo"] = link.get("linkinfo", {})
+                link["linkinfo"].update({"info_kind": re.sub("[0-9]+", "", link["ifname"])})
 
-            if (index := list_index(links, "ifname", header["ifname"])) >= 0:
-                deep_update(link, links.pop(index))
-            links.append(link)
             inet_count = 0
             inet6_count = 0
             continue
@@ -286,6 +301,7 @@ def parse(res):
             parent = match.vlan.group("parent")
             if parent != "<none>":
                 link["link"] = parent
+            link["linkinfo"] = link.get("linkinfo", {})
             link["linkinfo"].update(
                 {
                     "info_data": {
@@ -295,15 +311,22 @@ def parse(res):
                     }
                 }
             )
+        elif match.feth:
+            peer = match.feth.group("peer")
+            if peer != "<none>":
+                link["link"] = peer
         elif match.bond:
-            for ifname in match.bond.group(1).split(" "):
-                slave = next(item for item in links if item["ifname"] == ifname)
+            for ifname in match.bond.group(1).split():
+                slave = find(links, ifname)
                 slave["master"] = link["ifname"]
                 slave["address"] = link["address"]
-                slave["linkinfo"] = {
-                    "info_slave_kind": "bond",
-                    "perm_hwaddr": slave["address"],
-                }
+                slave["linkinfo"] = slave.get("linkinfo", {})
+                slave["linkinfo"].update(
+                    {
+                        "info_slave_kind": "bond",
+                        "perm_hwaddr": slave["address"],
+                    }
+                )
         elif match.bridge:
             parse_bridge(lines, links, link)
         elif line:

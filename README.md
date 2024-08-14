@@ -90,7 +90,7 @@ Implemented syntax:
 >           ~~ipip~~ | ~~ipoib~~ | ~~ipvlan~~ | ~~ipvtap~~ |
 >           ~~macsec~~ | ~~macvlan~~ | ~~macvtap~~ |
 >           ~~netdevsim~~ | ~~nlmon~~ | ~~rmnet~~ | ~~sit~~ | ~~team~~ | ~~team_slave~~ |
->           ~~vcan~~ | ~~veth~~ | vlan | ~~vrf~~ | ~~vti~~ | ~~vxcan~~ | ~~vxlan~~ | ~~wwan~~ |
+>           ~~vcan~~ | **feth**<sup>5</sup> | vlan | ~~vrf~~ | ~~vti~~ | ~~vxcan~~ | ~~vxlan~~ | ~~wwan~~ |
 >           ~~xfrm~~ }
 
 Shows IPv4 and IPv6 addresses assigned to all network interfaces. The 'show' subcommand can be omitted:
@@ -129,6 +129,7 @@ ip address show to 192.168.0.0/24
 2. `address lifetime` for IPv6 addresses (-L flag of `ifconfig`) is not provided anymore in Sonoma (macOS 14); for IPv4, addresses *valid* and *prederred* lifetime, is supposed *forever* (0xffffffff = 4.294.967.295 = 32 bit).
 3. `sysctl net.inet6.ip6.temppltime` specifies the "preferred lifetime" for privacy addresses, in seconds, and defaults to 86400 (one day).
 4. `sysctl net.inet6.ip6.tempvltime` specifies the "valid lifetime" for privacy addresses, in second, and defaults to 604800 (one week).
+5. `veth` can be replaced by `feth` in macOS
 
 ### `ip address add`: add new protocol address
 ### `ip address change`: change protocol address
@@ -205,7 +206,7 @@ Create a VLAN with TAG 100 linked to en1:
 ip link add link en1 name vlan100 type vlan id 100
 ```
 
-Create a new bridge interface (auto numbering):
+Create a new bridge interface (auto numbering<sup>1</sup>):
 
 ```shell
 ip link add type bridge
@@ -222,6 +223,10 @@ Create a new static bond (vs lacp) interface:
 ```shell
 ip link add bond1 type bond mode active-backup
 ```
+
+#### Notes
+
+1. macOS `ifconfig` print the created interface name to the standard output
 
 ### `ip link delete`: delete virtual link
 
@@ -440,7 +445,7 @@ Then install requiered packages:
 
 ```shell
 python3 -m pip install -U pip
-python3 -m pip install pre-commit pytest
+python3 -m pip install pre-commit pytest pytest-console-scripts
 pre-commit install
 ```
 

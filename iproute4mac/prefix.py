@@ -81,7 +81,9 @@ class Prefix:
         return str(self) == str(other)
 
     def __contains__(self, other):
-        if isinstance(other, str):
+        if not isinstance(other, Prefix | str):
+            return False
+        elif isinstance(other, str):
             other = Prefix(other)
         if self._is_default:
             return True

@@ -53,7 +53,7 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
           ipip | ipoib | ipvlan | ipvtap |
           macsec | macvlan | macvtap | netdevsim |
           netkit | nlmon | pfcp | rmnet | sit | team | team_slave |
-          vcan | veth | vlan | vrf | vti | vxcan | vxlan | wwan |
+          vcan | feth | vlan | vrf | vti | vxcan | vxlan | wwan |
           xfrm | virt_wifi }""")
     exit(-1)
 
@@ -78,7 +78,7 @@ def ipaddr_add(dev, local, broadcast):
             broadcast = str(broadcast)
         args += ("broadcast", broadcast)
 
-    if res := ifconfig.exec(dev, proto, address, args, "alias"):
+    if res := ifconfig.run(dev, proto, address, args, "alias"):
         stdout(res, optional=True)
 
 
@@ -90,7 +90,7 @@ def ipaddr_del(dev, local):
         address = None
         proto = None
 
-    if res := ifconfig.exec(dev, proto, address, "-alias"):
+    if res := ifconfig.run(dev, proto, address, "-alias"):
         stdout(res, optional=True)
 
 
@@ -174,7 +174,7 @@ def ipaddr_modify(cmd, argv):
 
 
 def get_ifconfig_links(argv, usage=usage):
-    res = ifconfig.exec("-v", "-L", "-a")
+    res = ifconfig.run("-v", "-L", "-a")
     links = ifconfig.parse(res)
     ref_links = list(links)
     dev = None
@@ -185,8 +185,8 @@ def get_ifconfig_links(argv, usage=usage):
             if prefix.family != AF_UNSPEC:
                 OPTION["preferred_family"] = prefix.family
             for link in links:
-                link["addr_info"] = [addr for addr in link.get("addr_info", []) if addr["local"] in prefix]
-            links = [link for link in links if link["addr_info"]]
+                link["addr_info"] = [a for a in link.get("addr_info", []) if a["local"] in prefix]
+            links = [l for l in links if l["addr_info"]]
         elif strcmp(opt, "scope"):
             scope = next_arg(argv)
             if scope not in ("link", "host", "global", "all") and not scope.isdigit():
@@ -194,10 +194,10 @@ def get_ifconfig_links(argv, usage=usage):
             if scope == "all":
                 continue
             for link in links:
-                link["addr_info"] = [addr for addr in link.get("addr_info", []) if addr["scope"] == scope]
-            links = [link for link in links if link["addr_info"]]
+                link["addr_info"] = [a for a in link.get("addr_info", []) if a["scope"] == scope]
+            links = [l for l in links if l["addr_info"]]
         elif strcmp(opt, "up"):
-            links = [link for link in links if ("flags" in link and "UP" in link["flags"])]
+            links = [l for l in links if "UP" in l.get("flags", [])]
         elif strcmp(opt, "label"):
             do_notimplemented([opt])
         elif strcmp(opt, "group"):
@@ -206,25 +206,25 @@ def get_ifconfig_links(argv, usage=usage):
             master = next_arg(argv)
             if not any(link["ifname"] == master for link in ref_links):
                 invarg("Device does not exist", master)
-            links = [link for link in links if link.get("master") == master]
+            links = [l for l in links if l.get("master") == master]
         elif strcmp(opt, "vrf"):
             vrf = next_arg(argv)
             if not any(link["ifname"] == vrf for link in ref_links):
                 invarg("Not a valid VRF name", vrf)
             # if not is_vrf(vrf):
             #     invarg("Not a valid VRF name", vrf)
-            # links = [link for link in links if link.get("master") == vrf]
+            # links = [l for l in links if l.get("master") == vrf]
             # FIXME: https://wiki.netunix.net/freebsd/network/vrf/
             do_notimplemented([opt])
         elif strcmp(opt, "nomaster"):
-            links = [link for link in links if "master" not in link]
+            links = [l for l in links if "master" not in l]
         elif strcmp(opt, "type"):
             kind = next_arg(argv)
             if kind.endswith("_slave"):
                 kind = kind.replace("_slave", "")
-                links = [link for link in links if recurse_in(link, ["linkinfo", "info_slave_kind"], kind)]
+                links = [l for l in links if recurse_in(l, ["linkinfo", "info_slave_kind"], kind)]
             else:
-                links = [link for link in links if recurse_in(link, ["linkinfo", "info_kind"], kind)]
+                links = [l for l in links if recurse_in(l, ["linkinfo", "info_kind"], kind)]
         else:
             if strcmp(opt, "dev"):
                 opt = next_arg(argv)
@@ -236,7 +236,7 @@ def get_ifconfig_links(argv, usage=usage):
                 stderr(f'Device "{opt}" does not exist.')
                 exit(-1)
             dev = opt
-            links = [link for link in links if link["ifname"] == dev]
+            links = [l for l in links if l["ifname"] == dev]
 
     if not OPTION["show_details"]:
         delete_keys(links, "linkinfo")
@@ -256,12 +256,12 @@ def ipaddr_list_or_flush(argv, flush=False):
     links = get_ifconfig_links(argv)
     if OPTION["preferred_family"] in (AF_INET, AF_INET6, AF_MPLS, AF_BRIDGE):
         family = family_name(OPTION["preferred_family"])
-        links = [link for link in links if any(addr["family"] == family for addr in link.get("addr_info", []))]
+        links = [l for l in links if any(a["family"] == family for a in l.get("addr_info", []))]
 
     if flush:
         for link in links:
             for addr in link["addr_info"]:
-                ifconfig.exec(link["ifname"], addr["family"], addr["local"], "-alias")
+                ifconfig.run(link["ifname"], addr["family"], addr["local"], "-alias")
     else:
         ifconfig.dumps(links)
 

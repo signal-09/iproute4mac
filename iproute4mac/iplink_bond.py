@@ -132,24 +132,42 @@ def parse(argv, args):
 
 
 def add(dev, args):
-    return ifconfig.exec(dev, "create")
+    if res := ifconfig.run(dev, "create"):
+        stdout(res, optional=True)
 
 
 def set(dev, args):
     res = ""
     for opt, value in args.items():
         if strcmp(opt, "mode"):
-            res += ifconfig.exec(dev, "bondmode", value)
-
-    return res
-
-
-def link(dev, master):
-    ifconfig.exec(master, "bonddev", dev)
+            res += ifconfig.run(dev, "bondmode", value)
+    if res:
+        stdout(res, optional=True)
 
 
-def free(dev, master):
-    ifconfig.exec(master, "-bonddev", dev)
+def delete(link, args):
+    ifconfig.run(link["ifname"], "destroy")
+
+
+def link(link, master):
+    ifconfig.run(str(master["ifname"]), "bonddev", str(link["ifname"]))
+    link["master"] = master["ifname"]
+    link["linkinfo"] = link.get("linkinfo", {})
+    link["linkinfo"].update(
+        {
+            "info_slave_kind": "bond",
+            "perm_hwaddr": link["address"],
+        }
+    )
+
+
+def free(link, master):
+    ifconfig.run(str(master["ifname"]), "-bonddev", str(link["ifname"]))
+    del link["linkinfo"]["info_slave_kind"]
+    del link["linkinfo"]["perm_hwaddr"]
+    if not link["linkinfo"]:
+        del link["linkinfo"]
+    del link["master"]
 
 
 def dump(argv, links):

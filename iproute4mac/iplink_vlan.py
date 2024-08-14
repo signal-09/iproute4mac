@@ -131,24 +131,32 @@ def parse(argv, args):
 def add(dev, args):
     vlan_id = args.pop("id")
     vlan_link = args.pop("link")
-    if res := ifconfig.exec(dev, "create"):
+    if res := ifconfig.run(dev, "create"):
         stdout(res, optional=True)
         dev = res.rstrip()
-    res = ifconfig.exec(dev, "vlan", vlan_id, "vlandev", vlan_link, fatal=False)
-    if isinstance(res, int):
-        res = ifconfig.exec(dev, "destroy")
-    return res
+
+    try:
+        if res := ifconfig.run(dev, "vlan", vlan_id, "vlandev", vlan_link, fatal=False):
+            stdout(res, optional=True)
+        assert isinstance(res, str)
+    except AssertionError:
+        ifconfig.run(dev, "destroy")
+        exit(res)
 
 
 def set(dev, args):
-    return ""
-
-
-def link(dev, master):
     pass
 
 
-def free(dev, master):
+def delete(link, args):
+    ifconfig.run(link["ifname"], "destroy")
+
+
+def link(link, master):
+    pass
+
+
+def free(link, master):
     pass
 
 

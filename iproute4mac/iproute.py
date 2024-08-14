@@ -69,21 +69,21 @@ ROUTE_GET_FLAG := [ connected | fibmatch | notify ]""")
 
 
 def iproute_add(argv):
-    res = route.exec("add", argv)
+    res = route.run("add", argv)
     if res.find("File exists") > -1:
         stderr("RTNETLINK answers: File exists")
         exit(2)
 
 
 def iproute_del(argv):
-    res = route.exec("delete", argv)
+    res = route.run("delete", argv)
     if res.find("not in table") > -1:
         stderr("RTNETLINK answers: No such process")
         exit(2)
 
 
 def iproute_change(argv):
-    route.exec("change", argv)
+    route.run("change", argv)
 
 
 def iproute_modify(cmd, argv):
@@ -448,7 +448,7 @@ def iproute_get(argv):
     if prefix.family == AF_INET6 or OPTION["preferred_family"] == AF_INET6:
         argv += ["-inet6"]
 
-    res = route.exec(argv, repr(prefix))
+    res = route.run(argv, repr(prefix))
     get = route.parse(res)
     route.dumps(get)
 
@@ -459,7 +459,7 @@ def iproute_list(argv):
     if OPTION["preferred_family"] == AF_UNSPEC:
         OPTION["preferred_family"] = AF_INET
 
-    res = netstat.exec("-n", "-r")
+    res = netstat.run("-n", "-r")
     entries = netstat.parse(res)
     while argv:
         opt = argv.pop(0)
@@ -480,7 +480,7 @@ def iproute_list(argv):
                 invarg('invalid "protocol"', protocol)
             if protocol == "all":
                 continue
-            entries = [entry for entry in entries if "protocol" in entry and entry.get("protocol") == protocol]
+            entries = [e for e in entries if e.get("protocol") == protocol]
             delete_keys(entries, "protocol")
         elif matches(opt, "scope"):
             scope = next_arg(argv)
@@ -489,20 +489,16 @@ def iproute_list(argv):
             if scope == "all":
                 continue
             # FIXME: numeric scope?
-            entries = [entry for entry in entries if "scope" in entry and entry.get("scope") == scope]
+            entries = [e for e in entries if e.get("scope") == scope]
             delete_keys(entries, "scope")
         elif matches(opt, "type"):
             rt = next_arg(argv)
             if not route.is_rtn(rt):
                 invarg("node type value is invalid", rt)
-            entries = [
-                entry
-                for entry in entries
-                if (("type" in entry and entry["type"] == rt) or ("type" not in entry and rt == "unicast"))
-            ]
+            entries = [e for e in entries if (e.get("type") == rt or ("type" not in e and rt == "unicast"))]
         elif strcmp(opt, "dev", "oif", "iif"):
             dev = next_arg(argv)
-            entries = [entry for entry in entries if "dev" in entry and entry["dev"] == dev]
+            entries = [e for e in entries if e.get("dev") == dev]
             delete_keys(entries, "dev")
         elif strcmp(opt, "mark"):
             mark = next_arg(argv)
@@ -522,7 +518,7 @@ def iproute_list(argv):
             else:
                 via = next_arg(argv)
             prefix = get_prefix(via, family)
-            entries = [entry for entry in entries if "gateway" in entry and prefix in entry["gateway"]]
+            entries = [e for e in entries if "gateway" in e and prefix in e["gateway"]]
             delete_keys(entries, "gateway")
         elif strcmp(opt, "src"):
             src = next_arg(argv)
@@ -555,12 +551,12 @@ def iproute_list(argv):
             elif matches(opt, "match"):
                 opt = next_arg(argv)
                 prefix = get_prefix(opt, OPTION["preferred_family"])
-                entries = [entry for entry in entries if "dst" in entry and prefix in entry["dst"]]
+                entries = [e for e in entries if "dst" in e and prefix in e["dst"]]
             else:
                 if matches(opt, "exact"):
                     opt = next_arg(argv)
                 prefix = get_prefix(opt, OPTION["preferred_family"])
-                entries = [entry for entry in entries if "dst" in entry and prefix == entry["dst"]]
+                entries = [e for e in entries if "dst" in e and prefix == e["dst"]]
 
     netstat.dumps(entries)
 

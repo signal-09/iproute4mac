@@ -11,30 +11,6 @@ from iproute4mac import *
 from iproute4mac.prefix import Prefix
 
 
-# global options
-OPTION = {
-    "preferred_family": AF_UNSPEC,
-    "human_readable": False,
-    "use_iec": False,
-    "show_stats": False,
-    "show_details": False,
-    "oneline": False,
-    "brief": False,
-    "json": False,
-    "pretty": False,
-    "timestamp": False,
-    "timestamp_short": False,
-    "echo_request": False,
-    "force": False,
-    "max_flush_loops": 10,
-    "batch_mode": False,
-    "do_all": False,
-    "uid": os.getuid(),
-    "compress_vlans": False,
-    "verbose": 2,
-    "quiet": False,
-}
-
 # logging
 LOG_STDERR = 0
 LOG_HINT = 1
@@ -44,11 +20,13 @@ LOG_INFO = 4
 LOG_DEBUG = 5
 LOG_LABEL = (None, "Hint", "Error", "Warning", "Info", "Debug")
 
+OPTION["uid"] = os.getuid()
 
-def stdout(*argv, sep="", end="", optional=False):
+
+def stdout(*args, sep="", end="", optional=False):
     if optional and OPTION["quiet"]:
         return
-    print(*argv, sep=sep, end=end)
+    print(*args, sep=sep, end=end)
 
 
 def stderr(text, log_level=LOG_STDERR):
@@ -109,6 +87,13 @@ def incomplete_command():
     exit(-1)
 
 
+def output(obj):
+    if OPTION["json"]:
+        stdout(json_dumps(obj.dict(details=OPTION["show_details"])), end="\n")
+    else:
+        stdout(obj.str(details=OPTION["show_details"]))
+
+
 def next_arg(argv):
     try:
         return argv.pop(0)
@@ -117,14 +102,14 @@ def next_arg(argv):
 
 
 def read_family(name):
-    for f, n in address_families:
+    for f, n in ADDRESS_FAMILIES:
         if name == n:
             return f
     return AF_UNSPEC
 
 
 def family_name(family):
-    for f, n in address_families:
+    for f, n in ADDRESS_FAMILIES:
         if family == f:
             return n
     return "???"
@@ -172,9 +157,9 @@ def recurse_in(data, attr, val):
     return False
 
 
-def delete_keys(data, *argv):
+def delete_keys(data, *args):
     for entry in data:
-        for arg in argv:
+        for arg in args:
             entry.pop(arg, None)
 
 
@@ -191,8 +176,8 @@ def ref(obj_id):
     return PyObj_FromPtr(obj_id)
 
 
-def json_dumps(data, pretty=False):
-    if pretty:
+def json_dumps(data):
+    if OPTION["pretty"]:
         return json.dumps(data, cls=PrettyJSON, indent=4)
     return json.dumps(data, cls=SimpleJSON, separators=(",", ":"))
 
@@ -251,38 +236,32 @@ class PrettyJSON(json.JSONEncoder):
         return json_repr
 
 
-def flat_tuple(*argv):
-    args = ()
-    for arg in argv:
+def flat_tuple(*args):
+    res = ()
+    for arg in args:
         if arg is None:
             continue
-        if isinstance(arg, list):
-            args += tuple(arg)
-        elif isinstance(arg, tuple):
-            args += arg
+        if isinstance(arg, list | tuple):
+            res += flat_tuple(*arg)
         else:
-            args += (arg,)
-    return args
+            res += (str(arg),)
+    return res
 
 
-def strcmp(opt, *argv):
-    args = flat_tuple(*argv)
-    return any(arg == opt for arg in args)
+def strcmp(opt, *args):
+    return any(arg == opt for arg in flat_tuple(*args))
 
 
-def matches(opt, *argv):
-    args = flat_tuple(*argv)
-    return any(arg.startswith(opt) for arg in args)
+def matches(opt, *args):
+    return any(arg.startswith(opt) for arg in flat_tuple(*args))
 
 
-def startwith(opt, *argv):
-    args = flat_tuple(*argv)
-    return any(opt.startswith(arg) for arg in args)
+def startwith(opt, *args):
+    return any(opt.startswith(arg) for arg in flat_tuple(*args))
 
 
-def endwith(opt, *argv):
-    args = flat_tuple(*argv)
-    return any(opt.endswith(arg) for arg in args)
+def endwith(opt, *args):
+    return any(opt.endswith(arg) for arg in flat_tuple(*args))
 
 
 def matches_color(opt):
@@ -319,8 +298,8 @@ def options_restore(options={}):
     OPTION.update(options)
 
 
-def shell(*argv, fatal=True):
-    args = flat_tuple(*argv)
+def shell(*args, fatal=True):
+    args = flat_tuple(*args)
     info('executing "' + " ".join(args) + '"')
     cmd = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, encoding="utf-8")
     if cmd.returncode != 0:
@@ -366,8 +345,15 @@ def get_prefsrc(host):
     return src
 
 
-def do_notimplemented(argv=[]):
-    if argv:
-        error('"' + " ".join(argv) + '" not implemented')
+def do_notsupported(*args):
+    if args:
+        error('"' + " ".join(map(str, args)) + '" not supported')
+    else:
+        error("function not supported")
+
+
+def do_notimplemented(*args):
+    if args:
+        error('"' + " ".join(map(str, args)) + '" not implemented')
     else:
         error("function not implemented")

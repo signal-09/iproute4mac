@@ -22,7 +22,7 @@ def family_to_version(family):
 class Prefix:
     __slots__ = ("_address", "_network", "_type")
 
-    def __init__(self, prefix, family=None, version=None):
+    def __init__(self, prefix, family=None, version=None, pack=False):
         if family is not None and version is not None:
             raise VelueError("'family' and 'version' are mutually exclusive")
         elif family:
@@ -30,6 +30,20 @@ class Prefix:
         elif version and version not in (4, 6):
             raise ValueError("unknown IP version")
         self._address = self._network = self._type = None
+        if isinstance(prefix, ipaddress._IPAddressBase):
+            if version and prefix.version != version:
+                raise ValueError("prefix address family or version does not match")
+            if isinstance(prefix, ipaddress._BaseAddress):
+                self._address = prefix
+                return
+            if isinstance(prefix, ipaddress._BaseNetwork):
+                if pack and prefix.prefixlen == prefix._max_prefixlen:
+                    self._address = prefix.network_address
+                else:
+                    self._network = prefix
+                return
+        if not isinstance(prefix, str):
+            raise ValueError(f"unsupported prefix type {type(prefix)}")
         if prefix == "localhost":
             if version == 4:
                 self._address = ipaddress.ip_address("127.0.0.1")
@@ -68,6 +82,9 @@ class Prefix:
             except ValueError:
                 self._address = ipaddress.ip_address(prefix)
                 self._network = ipaddress.ip_network(f"{prefix}/{prefixlen}", strict=False)
+            if pack and self._network.prefixlen == self._network._max_prefixlen:
+                self._address = self._network.network_address
+                self._network = None
         else:
             self._address = ipaddress.ip_address(prefix)
         if version and self.address.version != version:
@@ -76,7 +93,7 @@ class Prefix:
     def __eq__(self, other):
         if isinstance(other, str):
             other = Prefix(other)
-        if self._initialized and other._initialized:
+        if isinstance(other, Prefix) and self._initialized and other._initialized:
             return self.prefix == other.prefix
         return str(self) == str(other)
 

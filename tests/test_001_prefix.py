@@ -264,3 +264,17 @@ def test_in():
     for a, b, v in addresses:
         print(repr(a), repr(b))
         assert (a in b) == v
+
+
+def test_pack():
+    addresses = (
+        (Prefix("192.168.0.1/24", pack=True), "192.168.0.1/24"),
+        (Prefix("192.168.0.1/32", pack=True), "192.168.0.1"),
+        (Prefix("192.168.0.0/32", pack=True), "192.168.0.0"),
+        (Prefix("192.168.0.1/24", pack=False), "192.168.0.1/24"),
+        (Prefix("192.168.0.1/32", pack=False), "192.168.0.1/32"),
+        (Prefix("192.168.0.0/32", pack=False), "192.168.0.0/32"),
+    )
+    for a, b in addresses:
+        print(repr(a), b)
+        assert repr(a) == b

@@ -69,61 +69,61 @@ def parse(argv, args):
                 invarg("bond mode not supported", bond)
             args["mode"] = bsd_bond
         elif matches(opt, "active_slave"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "clear_active_slave"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "miimon"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "updelay"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "downdelay"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "peer_notify_delay"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "use_carrier"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "arp_interval"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "arp_ip_target"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "arp_validate"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "arp_all_targets"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "primary"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "primary_reselect"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "fail_over_mac"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "xmit_hash_policy"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "resend_igmp"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "num_grat_arp", "num_unsol_na"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "all_slaves_active"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "min_links"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "lp_interval"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "packets_per_slave"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "lacp_rate"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "lacp_active"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "ad_select"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "ad_user_port_key"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "ad_actor_sys_prio"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "ad_actor_system"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "tlb_dynamic_lb"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "help"):
             explain()
         else:
@@ -150,7 +150,7 @@ def delete(link, args):
 
 
 def link(link, master):
-    ifconfig.run(str(master["ifname"]), "bonddev", str(link["ifname"]))
+    ifconfig.run(master["ifname"], "bonddev", link["ifname"])
     link["master"] = master["ifname"]
     link["linkinfo"] = link.get("linkinfo", {})
     link["linkinfo"].update(
@@ -162,7 +162,7 @@ def link(link, master):
 
 
 def free(link, master):
-    ifconfig.run(str(master["ifname"]), "-bonddev", str(link["ifname"]))
+    ifconfig.run(master["ifname"], "-bonddev", link["ifname"])
     del link["linkinfo"]["info_slave_kind"]
     del link["linkinfo"]["perm_hwaddr"]
     if not link["linkinfo"]:

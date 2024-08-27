@@ -16,35 +16,35 @@ def setup_module(module):
 def teardown_module(module):
     """teardown any state that was previously setup with a setup_module method"""
     if _FETH1:
-        system(f"sudo ifconfig {_FETH1} destroy")
+        system(f"ifconfig {_FETH1} destroy")
     if _FETH2:
-        system(f"sudo ifconfig {_FETH2} destroy")
+        system(f"ifconfig {_FETH2} destroy")
 
 
 def test_ip_link_add_feth(script_runner):
-    res = script_runner.run("sudo ip link add type feth".split())
+    res = script_runner.run("ip link add type feth".split())
     globals()["_FETH1"] = res.stdout.rstrip()
     assert res.returncode == 0
     assert res.stdout.startswith(_FETH1)
     assert res.stderr == ""
 
-    res = script_runner.run(f"sudo ip addr add {_FETH1_IP} brd + dev {_FETH1}".split())
+    res = script_runner.run(f"ip addr add {_FETH1_IP} brd + dev {_FETH1}".split())
     assert res.returncode == 0
     assert res.stdout == ""
     assert res.stderr == ""
 
-    res = script_runner.run("sudo ip link add type feth".split())
+    res = script_runner.run("ip link add type feth".split())
     globals()["_FETH2"] = res.stdout.rstrip()
     assert res.returncode == 0
     assert res.stdout.startswith(_FETH2)
     assert res.stderr == ""
 
-    res = script_runner.run(f"sudo ip addr add {_FETH2_IP} brd + dev {_FETH2}".split())
+    res = script_runner.run(f"ip addr add {_FETH2_IP} brd + dev {_FETH2}".split())
     assert res.returncode == 0
     assert res.stdout == ""
     assert res.stderr == ""
 
-    res = script_runner.run(f"sudo ip link add name {_FETH1} type feth".split())
+    res = script_runner.run(f"ip link add name {_FETH1} type feth".split())
     # assert res.returncode == 2
     assert res.returncode == 1
     assert res.stdout == ""
@@ -53,19 +53,19 @@ def test_ip_link_add_feth(script_runner):
 
 
 def test_ip_link_del_feth(script_runner):
-    res = script_runner.run(f"sudo ip link del {_FETH1}".split())
+    res = script_runner.run(f"ip link del {_FETH1}".split())
     assert res.returncode == 0
     assert res.stdout == ""
     assert res.stderr == ""
 
-    res = script_runner.run(f"sudo ip link del {_FETH2}".split())
+    res = script_runner.run(f"ip link del {_FETH2}".split())
     assert res.returncode == 0
     assert res.stdout == ""
     assert res.stderr == ""
 
 
 def test_ip_link_peer_feth(script_runner):
-    res = script_runner.run(f"sudo ip link add name {_FETH1} type feth peer {_FETH2}".split())
+    res = script_runner.run(f"ip link add name {_FETH1} type feth peer {_FETH2}".split())
     assert res.returncode == 0
     assert res.stdout == ""
     assert res.stderr == ""

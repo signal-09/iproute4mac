@@ -1,6 +1,7 @@
 import iproute4mac.ifconfig as ifconfig
 import iproute4mac.iplink_vlan as vlan
 import iproute4mac.iplink_feth as feth
+import iproute4mac.iplink_veth as veth
 import iproute4mac.iplink_bridge as bridge
 import iproute4mac.iplink_bond as bond
 
@@ -205,10 +206,10 @@ def iplink_modify(cmd, argv):
                 assert 0 <= int(index) < 2**16
             except (ValueError, AssertionError):
                 invarg('Invalid "index" value', index)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "link"):
             opt = next_arg(argv)
-            if not any(l["ifname"] == opt for l in links):
+            if not links.exist(opt):
                 invarg("Device does not exist", opt)
             modifiers["link"] = opt
         elif matches(opt, "address"):
@@ -222,7 +223,7 @@ def iplink_modify(cmd, argv):
             if not re.match(f"{LLADDR}$", lladdr):
                 stderr(f'"{lladdr}" is invalid lladdr.')
                 exit(-1)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "txqueuelen", "txqlen") or strcmp(opt, "qlen"):
             qlen = next_arg(argv)
             hint(f'per link queue length not supported, try "sysctl -w net.link.generic.system.sndq_maxlen={qlen}" instead.')
@@ -232,7 +233,7 @@ def iplink_modify(cmd, argv):
                 assert 0 <= int(qlen) < 2**16
             except (ValueError, AssertionError):
                 invarg('Invalid "txqueuelen" value', qlen)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "mtu"):
             mtu = next_arg(argv)
             if "mtu" in modifiers:
@@ -243,29 +244,29 @@ def iplink_modify(cmd, argv):
                 invarg('Invalid "mtu" value', mtu)
             modifiers["mtu"] = mtu
         elif strcmp(opt, "xdpgeneric", "xdpdrv", "xdpoffload", "xdp"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "netns"):
             netns = next_arg(argv)
             try:
                 assert 0 <= int(netns) < 2**16
             except (ValueError, AssertionError):
                 invarg('Invalid "netns" value', netns)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "multicast", "allmulticast"):
             multicast = next_arg(argv)
             if not strcmp(multicast, "on", "off"):
                 on_off(opt, multicast)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "promisc"):
             promisc = next_arg(argv)
             if not strcmp(promisc, "on", "off"):
                 on_off(opt, promisc)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "trailers"):
             trailers = next_arg(argv)
             if not strcmp(trailers, "on", "off"):
                 on_off(opt, trailers)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "arp"):
             arp = next_arg(argv)
             if not strcmp(arp, "on", "off"):
@@ -275,35 +276,35 @@ def iplink_modify(cmd, argv):
             carrier = next_arg(argv)
             if not strcmp(carrier, "on", "off"):
                 on_off(opt, carrier)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "vf"):
             vf = next_arg(argv)
             try:
                 assert 0 <= int(vf) < 2**16
             except (ValueError, AssertionError):
                 invarg('Invalid "vf" value', mtu)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "master"):
             opt = next_arg(argv)
-            if not any(l["ifname"] == opt for l in links):
+            if not links.exist(opt):
                 invarg("Device does not exist", opt)
             modifiers["master"] = opt
         elif strcmp(opt, "vrf"):
             vrf = next_arg(argv)
-            if not any(l["ifname"] == vrf for l in links):
+            if not links.exist(vrf):
                 invarg("Not a valid VRF name", vrf)
             # if not is_vrf(vrf):
             #     invarg("Not a valid VRF name", vrf)
             # links = [l for l in links if l.get("master") == vrf)]
             # FIXME: https://wiki.netunix.net/freebsd/network/vrf/
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "nomaster"):
             modifiers["nomaster"] = True
         elif matches(opt, "dynamic"):
             dynamic = next_arg(argv)
             if not strcmp(dynamic, "on", "off"):
                 on_off(opt, dynamic)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "type"):
             opt = next_arg(argv)
             if matches(opt, "help"):
@@ -314,26 +315,28 @@ def iplink_modify(cmd, argv):
                 invarg('"type" value is invalid', opt)
             if "name" not in modifiers:
                 modifiers["name"] = opt
+            elif not matches(opt, modifiers["name"]):
+                hint(f'arbitrary name "{modifiers["name"]}" not supported, try with "{opt}X"')
             break
         elif matches(opt, "alias"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "group"):
             group = next_arg(argv)
             try:
                 assert 0 <= int(group) < 2**8
             except (ValueError, AssertionError):
                 invarg('Invalid "group" value', group)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "mode"):
             mode = next_arg(argv)
             if not strcmp(mode, "default", "dormant"):
                 invarg("Invalid link mode", mode)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "state"):
             state = next_arg(argv)
             if not strcmp(state, "unknown", "notpresent", "down", "lowerlayerdown", "testing", "dormant", "up"):
                 invarg("Invalid operstate", state)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "numtxqueues"):
             qlen = next_arg(argv)
             try:
@@ -341,7 +344,7 @@ def iplink_modify(cmd, argv):
             except (ValueError, AssertionError):
                 invarg('Invalid "numtxqueues" value', qlen)
             hint(f'per link queue length not supported, try "sysctl -w net.link.generic.system.sndq_maxlen={qlen}" instead.')
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "numrxqueues"):
             qlen = next_arg(argv)
             try:
@@ -349,31 +352,31 @@ def iplink_modify(cmd, argv):
             except (ValueError, AssertionError):
                 invarg('Invalid "numrxqueues" value', qlen)
             hint(f'per link queue length not supported, try "sysctl -w net.link.generic.system.rcvq_maxlen={qlen}" instead.')
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "addrgenmode"):
             mode = next_arg(argv)
             if not strcmp(mode, "eui64", "none", "stable_secret", "random"):
                 invarg("Invalid address generation mode", mode)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "link-netns"):
             netns = next_arg(argv)
             try:
                 assert 0 <= int(netns) < 2**16
             except (ValueError, AssertionError):
                 invarg('Invalid "link-netns" value', netns)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "link-netnsid"):
             netns = next_arg(argv)
             try:
                 assert 0 <= int(netns) < 2**16
             except (ValueError, AssertionError):
                 invarg('Invalid "link-netnsid" value', netns)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "protodown"):
             down = next_arg(argv)
             if not strcmp(down, "on", "off"):
                 on_off(opt, down)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "protodown_reason"):
             preason = next_arg(argv)
             try:
@@ -383,16 +386,16 @@ def iplink_modify(cmd, argv):
             down = next_arg(argv)
             if not strcmp(down, "on", "off"):
                 on_off(opt, down)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "gso_max_size", "gso_max_segs", "gro_max_size"):
             max_size = next_arg(argv)
             try:
                 assert 0 <= int(max_size) < 2**32
             except (ValueError, AssertionError):
                 invarg('Invalid "{opt}" value', max_size)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "parentdev"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         else:
             if matches(opt, "help"):
                 usage()
@@ -442,13 +445,14 @@ def iplink_modify(cmd, argv):
 
 def get_iplinks(argv=[]):
     links = get_ifconfig_links(argv, usage)
-    delete_keys(links, "addr_info")
+    for link in links:
+        del link["addr_info"]
     return links
 
 
 def iplink_list(argv):
     OPTION["preferred_family"] = AF_PACKET
-    ifconfig.dumps(get_iplinks(argv))
+    output(get_iplinks(argv))
     return EXIT_SUCCESS
 
 

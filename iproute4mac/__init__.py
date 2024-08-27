@@ -1,4 +1,4 @@
-VERSION = "0.3.2"
+VERSION = "0.4.0"
 
 # socket.h
 AF_UNSPEC = 0
@@ -9,7 +9,7 @@ AF_INET6 = 10
 AF_PACKET = 17  # not present in BSD
 AF_MPLS = 28
 
-address_families = [
+ADDRESS_FAMILIES = [
     (AF_UNSPEC, "none"),
     (AF_INET, "inet"),
     (AF_INET6, "inet6"),
@@ -18,13 +18,37 @@ address_families = [
     (AF_BRIDGE, "bridge"),
 ]
 
+# global options
+OPTION = {
+    "preferred_family": AF_UNSPEC,
+    "human_readable": False,
+    "use_iec": False,
+    "show_stats": False,
+    "show_details": False,
+    "oneline": False,
+    "brief": False,
+    "json": False,
+    "pretty": False,
+    "timestamp": False,
+    "timestamp_short": False,
+    "echo_request": False,
+    "force": False,
+    "max_flush_loops": 10,
+    "batch_mode": False,
+    "do_all": False,
+    "uid": -1,
+    "compress_vlans": False,
+    "verbose": 2,
+    "quiet": False,
+}
+
 # libc
 EXIT_FAILURE = 1
 EXIT_SUCCESS = 0
 EXIT_ERROR = -1
 
 # map operstates
-oper_states = {"active": "UP", "inactive": "DOWN"}
+OPER_STATES = {"active": "UP", "inactive": "DOWN"}
 
 # MAC address RegEx
 LLSEG = "[0-9a-fA-F]{1,2}"
@@ -52,7 +76,6 @@ IPV6GROUPS = (
 IPV6ADDR = "|".join([f"(?:{group})" for group in IPV6GROUPS[::-1]])
 IPV6ADDR = f"(?:{IPV6ADDR})"
 
-# nu <netinet6/nd6.h>
-ND6_INFINITE_LIFETIME = 0xFFFFFFFF
-
+# ifconfig
 IFNAME = r"(?:\w+\d+)"
+NETIF = r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"

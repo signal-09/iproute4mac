@@ -123,30 +123,30 @@ def ipaddr_modify(cmd, argv):
                 duparg("anycast", opt)
             anycast = get_addr(opt, OPTION["preferred_family"])
             # FIXME: anycast is supported by ifconfig
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "scope"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "dev"):
             dev = next_arg(argv)
         elif strcmp(opt, "label"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "metric", "priority", "preference"):
             metric = next_arg(argv)
             try:
                 assert 0 <= int(metric) < 2**32
             except (ValueError, AssertionError):
                 invarg('"metric" value is invalid', metric)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "valid_lft"):
             lft = next_arg(argv)
             hint(f'try "sysctl -w net.inet6.ip6.tempvltime={lft}" instead.')
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "preferred_lft"):
             lft = next_arg(argv)
             hint(f'try "sysctl -w net.inet6.ip6.temppltime={lft}" instead.')
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, FLAG_MASK):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         else:
             if strcmp(opt, "local"):
                 opt = next_arg(argv)
@@ -174,9 +174,7 @@ def ipaddr_modify(cmd, argv):
 
 
 def get_ifconfig_links(argv, usage=usage):
-    res = ifconfig.run("-v", "-L", "-a")
-    links = ifconfig.parse(res)
-    ref_links = list(links)
+    links = ifconfig.Ifconfig()
     dev = None
     while argv:
         opt = argv.pop(0)
@@ -186,7 +184,7 @@ def get_ifconfig_links(argv, usage=usage):
                 OPTION["preferred_family"] = prefix.family
             for link in links:
                 link["addr_info"] = [a for a in link.get("addr_info", []) if a["local"] in prefix]
-            links = [l for l in links if l["addr_info"]]
+            links.set([l for l in links if l["addr_info"]])
         elif strcmp(opt, "scope"):
             scope = next_arg(argv)
             if scope not in ("link", "host", "global", "all") and not scope.isdigit():
@@ -195,36 +193,36 @@ def get_ifconfig_links(argv, usage=usage):
                 continue
             for link in links:
                 link["addr_info"] = [a for a in link.get("addr_info", []) if a["scope"] == scope]
-            links = [l for l in links if l["addr_info"]]
+            links.set([l for l in links if l["addr_info"]])
         elif strcmp(opt, "up"):
-            links = [l for l in links if "UP" in l.get("flags", [])]
+            links.set([l for l in links if "UP" in l.get("flags", [])])
         elif strcmp(opt, "label"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "group"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "master"):
             master = next_arg(argv)
-            if not any(link["ifname"] == master for link in ref_links):
+            if not links.exist(master):
                 invarg("Device does not exist", master)
-            links = [l for l in links if l.get("master") == master]
+            links.set([l for l in links if l.get("master") == master])
         elif strcmp(opt, "vrf"):
             vrf = next_arg(argv)
-            if not any(link["ifname"] == vrf for link in ref_links):
+            if not links.exist(vrf):
                 invarg("Not a valid VRF name", vrf)
             # if not is_vrf(vrf):
             #     invarg("Not a valid VRF name", vrf)
             # links = [l for l in links if l.get("master") == vrf]
             # FIXME: https://wiki.netunix.net/freebsd/network/vrf/
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "nomaster"):
-            links = [l for l in links if "master" not in l]
+            links.set([l for l in links if l.present("master")])
         elif strcmp(opt, "type"):
             kind = next_arg(argv)
             if kind.endswith("_slave"):
                 kind = kind.replace("_slave", "")
-                links = [l for l in links if recurse_in(l, ["linkinfo", "info_slave_kind"], kind)]
+                links.set([l for l in links if l.present("info_slave_kind", kind)])
             else:
-                links = [l for l in links if recurse_in(l, ["linkinfo", "info_kind"], kind)]
+                links.set([l for l in links if l.present("info_kind", kind)])
         else:
             if strcmp(opt, "dev"):
                 opt = next_arg(argv)
@@ -232,14 +230,11 @@ def get_ifconfig_links(argv, usage=usage):
                 usage()
             if dev:
                 duparg2("dev", opt)
-            if not any(link["ifname"] == opt for link in ref_links):
+            if not links.exist(opt):
                 stderr(f'Device "{opt}" does not exist.')
                 exit(-1)
             dev = opt
-            links = [l for l in links if l["ifname"] == dev]
-
-    if not OPTION["show_details"]:
-        delete_keys(links, "linkinfo")
+            links.set([l for l in links if l.ifname == dev])
 
     return links
 
@@ -256,14 +251,16 @@ def ipaddr_list_or_flush(argv, flush=False):
     links = get_ifconfig_links(argv)
     if OPTION["preferred_family"] in (AF_INET, AF_INET6, AF_MPLS, AF_BRIDGE):
         family = family_name(OPTION["preferred_family"])
-        links = [l for l in links if any(a["family"] == family for a in l.get("addr_info", []))]
+        links.set([l for l in links if any(a["family"] == family for a in l.get("addr_info", []))])
+        for link in links:
+            link["addr_info"] = [a for a in link["addr_info"] if a["family"] == family]
 
     if flush:
         for link in links:
             for addr in link["addr_info"]:
                 ifconfig.run(link["ifname"], addr["family"], addr["local"], "-alias")
     else:
-        ifconfig.dumps(links)
+        output(links)
 
     return EXIT_SUCCESS
 

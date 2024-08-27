@@ -78,13 +78,14 @@ QOS-MAPPING := FROM:TO""")
 
 
 def parse(argv, args):
+    vlan_id = None
     while argv:
         opt = argv.pop(0)
         if matches(opt, "protocol"):
             proto = next_arg(argv)
             if not strcmp(proto, LLPROTO_NAMES):
                 invarg("protocol is invalid", proto)
-            do_notimplemented([opt])
+            do_notsupported(opt, proto)
         elif matches(opt, "id"):
             vlan_id = next_arg(argv)
             try:
@@ -96,36 +97,42 @@ def parse(argv, args):
             switch = next_arg(argv)
             if not strcmp(switch, "on", "off"):
                 on_off("reorder_hdr", switch)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "gvrp"):
             switch = next_arg(argv)
             if not strcmp(switch, "on", "off"):
                 on_off("gvrp", switch)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mvrp"):
             switch = next_arg(argv)
             if not strcmp(switch, "on", "off"):
                 on_off("mvrp", switch)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "loose_binding"):
             switch = next_arg(argv)
             if not strcmp(switch, "on", "off"):
                 on_off("loose_binding", switch)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "bridge_binding"):
             switch = next_arg(argv)
             if not strcmp(switch, "on", "off"):
                 on_off("bridge_binding", switch)
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "ingress-qos-map"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "egress-qos-map"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "help"):
             explain()
         else:
             stderr(f'vlan: unknown command "{opt}"?')
             explain()
+
+    if vlan_id is None:
+        error("8021q: VLAN properties not specified.")
+
+    if "link" not in args:
+        error("8021q: link not specified.")
 
 
 def add(dev, args):

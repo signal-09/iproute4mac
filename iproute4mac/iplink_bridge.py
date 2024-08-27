@@ -51,15 +51,15 @@ def parse(argv, args):
     while argv:
         opt = argv.pop(0)
         if matches(opt, "forward_delay"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "hello_time"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "max_age"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "ageing_time"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "stp_state"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "priority"):
             prio = next_arg(argv)
             try:
@@ -68,61 +68,61 @@ def parse(argv, args):
                 invarg("Invalid priority", prio)
             args["priority"] = prio
         elif matches(opt, "vlan_filtering"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "vlan_protocol"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "group_fwd_mask"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "group_address"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "fdb_flush"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "vlan_default_pvid"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "vlan_stats_enabled"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "vlan_stats_per_port"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_router"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_snooping"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_query_use_ifaddr"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_querier"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_hash_elasticity"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_hash_max"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_last_member_count"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_startup_query_count"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_last_member_interval"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_membership_interval"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_querier_interval"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_query_interval"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_query_response_interval"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_startup_query_interval"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_stats_enabled"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_igmp_version"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "mcast_mld_version"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "nf_call_iptables"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "nf_call_ip6tables"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "nf_call_arptables"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif matches(opt, "help"):
             explain()
         else:
@@ -144,11 +144,11 @@ def delete(link, args):
 
 
 def link(link, master):
-    ifconfig.run(str(master["ifname"]), "addm", str(link["ifname"]))
+    ifconfig.run(master["ifname"], "addm", link["ifname"])
 
 
 def free(link, master):
-    ifconfig.run(str(master["ifname"]), "deletem", str(link["ifname"]))
+    ifconfig.run(master["ifname"], "deletem", link["ifname"])
 
 
 def dump(argv, links):

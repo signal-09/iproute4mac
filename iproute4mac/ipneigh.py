@@ -20,10 +20,11 @@ STATE := { delay | failed | incomplete | noarp | none |
 
 
 def ipneigh_modify(cmd, argv):
+    entries = nud.Nud()
     dev = None
     lla = None
     dst = None
-    state = None
+    states = []
     while argv:
         opt = argv.pop(0)
         if matches(opt, "lladdr"):
@@ -31,6 +32,7 @@ def ipneigh_modify(cmd, argv):
             if lla:
                 duparg("lladdr", opt)
             lla = opt
+            entries.set([e for e in entries if e["lladdr"] == lla])
         elif strcmp(opt, "nud"):
             state = next_arg(argv)
             if strcmp(state, "all"):
@@ -40,6 +42,7 @@ def ipneigh_modify(cmd, argv):
                 state = nud.from_string(state)
             except ValueError:
                 invarg("nud state is bad", state)
+            states.append(nud.to_state(state))
         elif matches(opt, "proxy"):
             opt = next_arg(argv)
             if matches(opt, "help"):
@@ -48,52 +51,17 @@ def ipneigh_modify(cmd, argv):
                 duparg("address", opt)
             dst = get_addr(opt, OPTION["preferred_family"])
         elif strcmp(opt, "router"):
-            do_notimplemented([opt])
+            entries.set([e for e in entries if "router" in e])
         elif matches(opt, "extern_learn"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "dev"):
-            dev = next_arg(argv)
-            do_notimplemented([opt, dev])
-        elif matches(opt, "protocol"):
-            do_notimplemented([opt])
-        else:
-            if strcmp(opt, "to"):
-                opt = next_arg(argv)
-            if matches(opt, "help"):
-                opt = next_arg(argv)
-            if dst:
-                duparg2("to", opt)
-            dst = get_addr(opt, OPTION["preferred_family"])
-
-    if matches(cmd, "add"):
-        do_notimplemented()
-    elif matches(cmd, "change"):
-        do_notimplemented()
-    elif matches(cmd, "replace"):
-        do_notimplemented()
-    elif matches(cmd, "delete"):
-        do_notimplemented()
-    else:
-        do_notimplemented()
-
-    return EXIT_SUCCESS
-
-
-def ipneigh_get(argv):
-    res = nud.run("-n", "-l", "-a")
-    entries = nud.parse(res)
-    dev = None
-    dst = None
-    while argv:
-        opt = argv.pop(0)
-        if strcmp(opt, "dev"):
             opt = next_arg(argv)
             if dev:
                 duparg("dev", opt)
             dev = opt
-            entries = [e for e in entries if e.get("dev") == dev]
-        elif strcmp(opt, "proxy"):
-            entries = [e for e in entries if "proxy" in e["state"]]
+            entries.set([e for e in entries if e["dev"] == dev])
+        elif matches(opt, "protocol"):
+            do_notimplemented(opt)
         else:
             if strcmp(opt, "to"):
                 opt = next_arg(argv)
@@ -105,14 +73,66 @@ def ipneigh_get(argv):
                 dst = get_addr(opt, OPTION["preferred_family"])
             except ValueError:
                 invarg("to value is invalid", opt)
-            entries = [e for entry in e if e["dst"] in dst]
+            entries.set([e for e in entries if e["dst"] in dst])
+
+    if not dev or not dst:
+        stderr("Device and destination are required arguments.")
+        exit(-1)
+
+    if OPTION["preferred_family"] != AF_UNSPEC:
+        entries.set([e for e in entries if e["dst"].family == OPTION["preferred_family"]])
+
+    if states:
+        entries.set([e for e in entries if set(e["state"]) <= set(states)])
+
+    if matches(cmd, "add"):
+        do_notimplemented()
+    elif matches(cmd, "change"):
+        do_notimplemented()
+    elif matches(cmd, "replace"):
+        do_notimplemented()
+    elif matches(cmd, "delete"):
+        for entry in entries:
+            nud.delete(entry["dst"], dev=entry["dev"])
+    else:
+        do_notimplemented()
+
+    return EXIT_SUCCESS
+
+
+def ipneigh_get(argv):
+    entries = nud.Nud()
+    dev = None
+    dst = None
+    while argv:
+        opt = argv.pop(0)
+        if strcmp(opt, "dev"):
+            opt = next_arg(argv)
+            if dev:
+                duparg("dev", opt)
+            dev = opt
+            entries.set([e for e in entries if e["dev"] == dev])
+        elif strcmp(opt, "proxy"):
+            entries.set([e for e in entries if "proxy" in e["state"]])
+        else:
+            if strcmp(opt, "to"):
+                opt = next_arg(argv)
+            if matches(opt, "help"):
+                usage()
+            if dst:
+                duparg2("to", opt)
+            try:
+                dst = get_addr(opt, OPTION["preferred_family"])
+            except ValueError:
+                invarg("to value is invalid", opt)
+            entries.set([e for e in entries if e["dst"] == dst])
 
     if not dev or not dst:
         stderr("Device and address are required arguments.")
         return EXIT_FAILURE
 
     OPTION["json"] = False
-    nud.dumps(entries)
+    output(entries)
 
     return EXIT_SUCCESS
 
@@ -122,9 +142,7 @@ def ipneigh_list_or_flush(argv, flush=False):
         stderr("Flush requires arguments.")
         exit(-1)
 
-    res = nud.run("-n", "-l", "-a")
-    entries = nud.parse(res)
-
+    entries = nud.Nud()
     dev = None
     states = []
     while argv:
@@ -134,16 +152,16 @@ def ipneigh_list_or_flush(argv, flush=False):
             if dev:
                 duparg("dev", opt)
             dev = opt
-            entries = [e for e in entries if e.get("dev") == dev]
+            entries.set([e for e in entries if e["dev"] == dev])
             if not flush:
                 delete_keys(entries, "dev")
         elif strcmp(opt, "master"):
             opt = next_arg(argv)
             warn("Kernel does not support filtering by master device")
         elif strcmp(opt, "vrf"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         elif strcmp(opt, "unused"):
-            entries = [e for e in entries if nud.to_state(NUD_REACHABLE) not in e["state"]]
+            entries.set([e for e in entries if e.unused])
         elif strcmp(opt, "nud"):
             state = next_arg(argv)
             if strcmp(state, "all"):
@@ -155,9 +173,9 @@ def ipneigh_list_or_flush(argv, flush=False):
                 invarg("nud state is bad", state)
             states.append(nud.to_state(state))
         elif strcmp(opt, "proxy"):
-            entries = [e for e in entries if "proxy" in e["state"]]
+            entries.set([e for e in entries if "proxy" in e["state"]])
         elif matches(opt, "protocol"):
-            do_notimplemented([opt])
+            do_notimplemented(opt)
         else:
             if strcmp(opt, "to"):
                 opt = next_arg(argv)
@@ -167,16 +185,19 @@ def ipneigh_list_or_flush(argv, flush=False):
                 prefix = get_addr(opt, OPTION["preferred_family"])
             except ValueError:
                 invarg("to value is invalid", opt)
-            entries = [e for e in entries if e["dst"] in prefix]
+            entries.set([e for e in entries if e["dst"] in prefix])
+
+    if OPTION["preferred_family"] != AF_UNSPEC:
+        entries.set([e for e in entries if e["dst"].family == OPTION["preferred_family"]])
 
     if states:
-        entries = [e for e in entries if set(e["state"]) <= set(states)]
+        entries.set([e for e in entries if set(e["state"]) <= set(states)])
 
     if flush:
         for entry in entries:
-            nud.delete(entry["dst"], dev=entry.get("dev"))
+            nud.delete(entry["dst"], dev=entry["dev"])
     else:
-        nud.dumps(entries)
+        output(entries)
 
     return EXIT_SUCCESS
 

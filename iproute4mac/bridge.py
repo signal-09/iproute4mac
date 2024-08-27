@@ -61,7 +61,7 @@ def main():
         if matches(opt, "-help"):
             usage()
         elif matches(opt, "-Version"):
-            print(f"bridge wrapper, iproute4mac-{iproute4mac.VERSION}")
+            print(f"bridge wrapper, iproute4mac-{VERSION}")
             exit(0)
         elif matches(opt, "-stats".startswith(opt) or "-statistics"):
             OPTION["show_stats"] = True
@@ -88,7 +88,7 @@ def main():
         elif matches(opt, "-netns"):
             do_notimplemented()
         elif matches_color(opt):
-            # Color option is not implemented
+            # silently ignore not implemented color option
             pass
         elif matches(opt, "-compressvlans"):
             OPTION["compress_vlans"] = True
@@ -103,6 +103,14 @@ def main():
                 batch_file = argv.pop(0)
             except IndexError:
                 missarg("batch file")
+        elif matches(opt, "-verbose", "-vvv"):
+            while opt[1] == "v" and OPTION["verbose"] < LOG_DEBUG:
+                OPTION["verbose"] += 1
+                if len(opt) <= 2:
+                    break
+                opt = opt[1:]
+        elif matches(opt, "-quiet"):
+            OPTION["quiet"] = True
         else:
             stderr(f'Option "{opt}" is unknown, try "bridge help".')
             exit(-1)

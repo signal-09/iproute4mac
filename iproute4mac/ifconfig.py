@@ -428,9 +428,9 @@ class _Iproute2:
             if "valid_life_time" in addr and "preferred_life_time" in addr:
                 res += (
                     "       valid_lft "
-                    + ("forever" if addr["valid_life_time"] == _ND6_INFINITE_LIFETIME else addr["valid_life_time"])
+                    + ("forever" if addr["valid_life_time"] == _ND6_INFINITE_LIFETIME else str(addr["valid_life_time"]))
                     + " preferred_lft "
-                    + ("forever" if addr["preferred_life_time"] == _ND6_INFINITE_LIFETIME else addr["preferred_life_time"])
+                    + ("forever" if addr["preferred_life_time"] == _ND6_INFINITE_LIFETIME else str(addr["preferred_life_time"]))
                 )
                 res += "\n"
 

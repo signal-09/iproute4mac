@@ -41,7 +41,7 @@ XMIT_HASH_POLICY := layer2|layer2+3|layer3+4|encap2+3|encap3+4|vlan+srcmac
 LACP_ACTIVE := off|on
 LACP_RATE := slow|fast
 AD_SELECT := stable|bandwidth|count""")
-    exit(-1)
+    exit(EXIT_ERROR)
 
 
 BOND_MODE = [

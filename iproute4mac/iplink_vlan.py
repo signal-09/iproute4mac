@@ -74,7 +74,7 @@ VLANID := 0-4095
 VLANPROTO: [ 802.1Q | 802.1ad ]
 QOS-MAP := [ QOS-MAP ] QOS-MAPPING
 QOS-MAPPING := FROM:TO""")
-    exit(-1)
+    exit(EXIT_ERROR)
 
 
 def parse(argv, args):

@@ -14,7 +14,7 @@ def shell(cmd):
 
 def setup_module(module):
     """setup any state specific to the execution of the given module"""
-    globals()["_EN"] = shell("netstat -nr -f inet | awk '/default/{ print $4 }'")
+    globals()["_EN"] = shell("netstat -nr -f inet | awk '/default/{ print $4 }' | head -1")
 
 
 def teardown_module(module):

@@ -16,7 +16,7 @@ Usage: ip neigh { add | del | change | replace }
 
 STATE := { delay | failed | incomplete | noarp | none |
            permanent | probe | reachable | stale }""")
-    exit(-1)
+    exit(EXIT_ERROR)
 
 
 def ipneigh_modify(cmd, argv):
@@ -77,7 +77,7 @@ def ipneigh_modify(cmd, argv):
 
     if not dev or not dst:
         stderr("Device and destination are required arguments.")
-        exit(-1)
+        exit(EXIT_ERROR)
 
     if OPTION["preferred_family"] != AF_UNSPEC:
         entries.set([e for e in entries if e["dst"].family == OPTION["preferred_family"]])
@@ -140,7 +140,7 @@ def ipneigh_get(argv):
 def ipneigh_list_or_flush(argv, flush=False):
     if flush and not argv:
         stderr("Flush requires arguments.")
-        exit(-1)
+        exit(EXIT_ERROR)
 
     entries = nud.Nud()
     dev = None
@@ -219,4 +219,4 @@ def do_ipneigh(argv):
         usage()
 
     stderr(f'Command "{cmd}" is unknown, try "ip neigh help".')
-    exit(-1)
+    exit(EXIT_ERROR)

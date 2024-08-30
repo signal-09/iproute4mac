@@ -28,7 +28,7 @@ where  OBJECT := { address | addrlabel | fou | help | ila | ioam | l2tp | link |
                     -o[neline] | -t[imestamp] | -ts[hort] | -b[atch] [filename] |
                     -rc[vbuf] [size] | -n[etns] name | -N[umeric] | -a[ll] |
                     -c[olor]}""")
-    exit(-1)
+    exit(EXIT_ERROR)
 
 
 # Implemented objects
@@ -83,7 +83,7 @@ def do_obj(argv):
 def main():
     if sys.platform != "darwin":
         stderr("Unupported OS.")
-        exit(-1)
+        exit(EXIT_ERROR)
 
     batch_file = None
     argv = sys.argv[1:]
@@ -144,7 +144,7 @@ def main():
             OPTION["timestamp_short"] = True
         elif matches(opt, "-Version"):
             print(f"ip wrapper, iproute4mac-{VERSION}")
-            exit(0)
+            exit(EXIT_SUCCESS)
         elif matches(opt, "-force"):
             OPTION["force"] = True
         elif matches(opt, "-batch"):
@@ -184,11 +184,13 @@ def main():
                 if len(opt) <= 2:
                     break
                 opt = opt[1:]
+        elif matches(opt, "-silent"):
+            OPTION["verbose"] = LOG_STDERR
         elif matches(opt, "-quiet"):
-            OPTION["quiet"] = True
+            OPTION["verbose"] = -1
         else:
             stderr(f'Option "{opt}" is unknown, try "ip -help".')
-            exit(-1)
+            exit(EXIT_ERROR)
 
     if batch_file:
         do_notimplemented()

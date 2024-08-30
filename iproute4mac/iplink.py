@@ -82,7 +82,7 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
           netkit | nlmon | pfcp | rmnet | sit | team | team_slave |
           vcan | feth | vlan | vrf | vti | vxcan | vxlan | wwan |
           xfrm | virt_wifi }""")
-    exit(-1)
+    exit(EXIT_ERROR)
 
 
 class LinkType:
@@ -128,7 +128,7 @@ def iplink_add(dev, link_type, args, links):
 def iplink_del(dev, link_type, args, links):
     if not (link := next((l for l in links if l["ifname"] == dev), None)):
         stderr(f'Cannot find device "{dev}"')
-        exit(1)
+        exit(EXIT_FAILURE)
 
     if not link_type:
         if kind := link.get("linkinfo", {}).get("info_kind"):
@@ -142,7 +142,7 @@ def iplink_del(dev, link_type, args, links):
 def iplink_set(dev, link_type, args, links):
     if not (link := next((l for l in links if l["ifname"] == dev), None)):
         stderr(f'Cannot find device "{dev}"')
-        exit(1)
+        exit(EXIT_FAILURE)
 
     res = ""
     for opt, value in args.items():
@@ -178,7 +178,7 @@ def iplink_set(dev, link_type, args, links):
 
 def iplink_modify(cmd, argv):
     # hide unrequested (but needed) system command from logs
-    old_options = options_override({"quiet": True, "show_details": True, "verbose": 0})
+    old_options = options_override({"show_details": True, "verbose": -1})
     links = get_iplinks()
     options_restore(old_options)
 
@@ -216,13 +216,13 @@ def iplink_modify(cmd, argv):
             lladdr = next_arg(argv)
             if not re.match(f"{LLADDR}$", lladdr):
                 stderr(f'"{lladdr}" is invalid lladdr.')
-                exit(-1)
+                exit(EXIT_ERROR)
             modifiers["address"] = lladdr
         elif matches(opt, "broadcast") or strcmp(opt, "brd"):
             lladdr = next_arg(argv)
             if not re.match(f"{LLADDR}$", lladdr):
                 stderr(f'"{lladdr}" is invalid lladdr.')
-                exit(-1)
+                exit(EXIT_ERROR)
             do_notimplemented(opt)
         elif matches(opt, "txqueuelen", "txqlen") or strcmp(opt, "qlen"):
             qlen = next_arg(argv)
@@ -417,18 +417,18 @@ def iplink_modify(cmd, argv):
 
     if not dev:
         stderr('Not enough information: "dev" argument is required.')
-        exit(-1)
+        exit(EXIT_ERROR)
     if argv:
         opt = next_arg(argv)
         if matches(opt, "help"):
             usage()
         stderr(f'Garbage instead of arguments "{opt} ...". Try "ip link help".')
-        exit(-1)
+        exit(EXIT_ERROR)
 
     if matches(cmd, "add"):
         if not link_type:
             stderr('Not enough information: "type" argument is required')
-            exit(-1)
+            exit(EXIT_ERROR)
         iplink_add(dev, link_type, modifiers, links)
     elif matches(cmd, "set", "change"):
         iplink_set(dev, link_type, modifiers, links)
@@ -475,4 +475,4 @@ def do_iplink(argv):
         return usage()
 
     stderr(f'Command "{cmd}" is unknown, try "ip link help".')
-    exit(-1)
+    exit(EXIT_ERROR)

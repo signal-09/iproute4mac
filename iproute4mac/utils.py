@@ -24,7 +24,7 @@ OPTION["uid"] = os.getuid()
 
 
 def stdout(*args, sep="", end="", optional=False):
-    if optional and OPTION["quiet"]:
+    if OPTION["verbose"] < LOG_STDERR or (optional and OPTION["verbose"] < LOG_HINT):
         return
     print(*args, sep=sep, end=end)
 
@@ -39,7 +39,7 @@ def stderr(text, log_level=LOG_STDERR):
 
 def error(text):
     stderr(text, log_level=LOG_ERROR)
-    exit(-1)
+    exit(EXIT_ERROR)
 
 
 def warn(text):
@@ -84,7 +84,7 @@ def on_off_switch(key, arg):
 
 def incomplete_command():
     stderr('Command line is not complete. Try option "help"')
-    exit(-1)
+    exit(EXIT_ERROR)
 
 
 def output(obj):

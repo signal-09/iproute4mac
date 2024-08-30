@@ -1,4 +1,4 @@
-VERSION = "0.4.1"
+VERSION = "0.4.2"
 
 # socket.h
 AF_UNSPEC = 0
@@ -38,14 +38,13 @@ OPTION = {
     "do_all": False,
     "uid": -1,
     "compress_vlans": False,
-    "verbose": 2,
-    "quiet": False,
+    "verbose": 3,
 }
 
 # libc
 EXIT_FAILURE = 1
 EXIT_SUCCESS = 0
-EXIT_ERROR = -1
+EXIT_ERROR = 255
 
 # map operstates
 OPER_STATES = {"active": "UP", "inactive": "DOWN"}

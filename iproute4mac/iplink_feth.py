@@ -11,7 +11,7 @@ def explain():
     stderr("""\
 Usage: ip link <options> type feth [peer <options>]
 To get <options> type 'ip link add help""")
-    exit(-1)
+    exit(EXIT_ERROR)
 
 
 def parse(argv, args):

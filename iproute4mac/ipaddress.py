@@ -55,7 +55,7 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
           netkit | nlmon | pfcp | rmnet | sit | team | team_slave |
           vcan | feth | vlan | vrf | vti | vxcan | vxlan | wwan |
           xfrm | virt_wifi }""")
-    exit(-1)
+    exit(EXIT_ERROR)
 
 
 def ipaddr_add(dev, local, broadcast):
@@ -232,7 +232,7 @@ def get_ifconfig_links(argv, usage=usage):
                 duparg2("dev", opt)
             if not links.exist(opt):
                 stderr(f'Device "{opt}" does not exist.')
-                exit(-1)
+                exit(EXIT_ERROR)
             dev = opt
             links.set([l for l in links if l.ifname == dev])
 
@@ -243,10 +243,10 @@ def ipaddr_list_or_flush(argv, flush=False):
     if flush:
         if not argv:
             stderr("Flush requires arguments.")
-            exit(-1)
+            exit(EXIT_ERROR)
         if OPTION["preferred_family"] == AF_PACKET:
             stderr("Cannot flush link addresses.")
-            exit(-1)
+            exit(EXIT_ERROR)
 
     links = get_ifconfig_links(argv)
     if OPTION["preferred_family"] in (AF_INET, AF_INET6, AF_MPLS, AF_BRIDGE):
@@ -286,4 +286,4 @@ def do_ipaddr(argv):
         return usage()
 
     stderr(f'Command "{cmd}" is unknown, try "ip address help".')
-    exit(-1)
+    exit(EXIT_ERROR)

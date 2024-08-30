@@ -64,7 +64,7 @@ IOAM6HDR := trace prealloc type IOAM6_TRACE_TYPE ns IOAM6_NAMESPACE size IOAM6_T
 XFRMINFO := if_id IF_ID [ link_dev LINK ]
 ROUTE_GET_FLAGS := ROUTE_GET_FLAG [ ROUTE_GET_FLAGS ]
 ROUTE_GET_FLAG := [ connected | fibmatch | notify ]""")
-    exit(-1)
+    exit(EXIT_ERROR)
 
 
 def iproute_add(argv):
@@ -456,7 +456,13 @@ def iproute_list(argv):
         opt = argv.pop(0)
         if matches(opt, "table"):
             table = next_arg(argv)
-            do_notimplemented(table)
+            if strcmp(table, "help"):
+                usage()
+            elif strcmp(table, "all"):
+                hint('"table all" are simulated simply joining IPv4 and IPv6')
+                OPTION["preferred_family"] = AF_PACKET
+            else:
+                do_notimplemented(opt)
         elif matches(opt, "vrf"):
             tid = next_arg(argv)
             do_notimplemented(tid)
@@ -514,13 +520,7 @@ def iproute_list(argv):
         elif strcmp(opt, "src"):
             prefix = get_prefix(next_arg(argv), OPTION["preferred_family"])
             if not prefix._is_default:
-                entries.set(
-                    [
-                        e
-                        for e in entries
-                        if (e.present("prefsrc") and e["prefsrc"] in prefix) or (prefix.is_default and e["dst"] in prefix)
-                    ]
-                )
+                entries.set([e for e in entries if e.source_from(prefix)])
                 if prefix.is_host:
                     delete_keys(entries, "prefsrc")
         elif matches(opt, "realms"):
@@ -561,7 +561,8 @@ def iproute_list(argv):
     if OPTION["preferred_family"] == AF_UNSPEC:
         OPTION["preferred_family"] = AF_INET
 
-    entries.set([e for e in entries if e["dst"].family == OPTION["preferred_family"]])
+    if OPTION["preferred_family"] != AF_PACKET:
+        entries.set([e for e in entries if e["dst"].family == OPTION["preferred_family"]])
     output(entries)
 
     return EXIT_SUCCESS
@@ -592,4 +593,4 @@ def do_iproute(argv):
         return usage()
 
     stderr(f'Command "{cmd}" is unknown, try "ip route help".')
-    exit(-1)
+    exit(EXIT_ERROR)

@@ -44,7 +44,7 @@ Usage: ... bridge [ fdb_flush ]
                  [ nf_call_arptables NF_CALL_ARPTABLES ]
 
 Where: VLAN_PROTOCOL := { 802.1Q | 802.1ad }""")
-    exit(-1)
+    exit(EXIT_ERROR)
 
 
 def parse(argv, args):

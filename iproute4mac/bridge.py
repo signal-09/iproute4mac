@@ -15,7 +15,7 @@ where  OBJECT := { link | fdb | mdb | vlan | vni | monitor }
        OPTIONS := { -V[ersion] | -s[tatistics] | -d[etails] |
                     -o[neline] | -t[imestamp] | -n[etns] name |
                     -com[pressvlans] -c[olor] -p[retty] -j[son] }""")
-    exit(-1)
+    exit(EXIT_ERROR)
 
 
 # Implemented objects
@@ -43,7 +43,7 @@ def do_obj(argv):
 def main():
     if sys.platform != "darwin":
         stderr("Unupported OS.")
-        exit(-1)
+        exit(EXIT_ERROR)
 
     batch_file = None
     argv = sys.argv[1:]
@@ -62,7 +62,7 @@ def main():
             usage()
         elif matches(opt, "-Version"):
             print(f"bridge wrapper, iproute4mac-{VERSION}")
-            exit(0)
+            exit(EXIT_SUCCESS)
         elif matches(opt, "-stats".startswith(opt) or "-statistics"):
             OPTION["show_stats"] = True
         elif matches(opt, "-details"):
@@ -109,11 +109,13 @@ def main():
                 if len(opt) <= 2:
                     break
                 opt = opt[1:]
+        elif matches(opt, "-silent"):
+            OPTION["verbose"] = LOG_STDERR
         elif matches(opt, "-quiet"):
-            OPTION["quiet"] = True
+            OPTION["verbose"] = -1
         else:
             stderr(f'Option "{opt}" is unknown, try "bridge help".')
-            exit(-1)
+            exit(EXIT_ERROR)
 
     if batch_file:
         do_notimplemented()

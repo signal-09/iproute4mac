@@ -36,14 +36,6 @@ brew tap signal-09/tap
 brew install iproute4mac
 ```
 
-#### Installing latest Git version (`HEAD`)
-
-You can install the latest Git version by adding the `--HEAD` option:
-
-```shell
-brew install signal-09/tap/iproute4mac --HEAD
-```
-
 ### PyPI
 
 Create a Virtual Environment and upgrade `pip` module:
@@ -252,7 +244,7 @@ Implemented syntax:
 > ip route [ show [ SELECTOR ] ]
 >
 > SELECTOR := [ ~~root PREFIX~~ ] [ ~~match PREFIX~~ ] [ ~~exact PREFIX~~ ]
->             [ ~~table TABLE_ID~~ ] [ ~~vrf NAME~~ ] [ proto RTPROTO ]
+>             [ ~~table<sup>2</sup> TABLE_ID~~ ] [ ~~vrf NAME~~ ] [ proto RTPROTO ]
 >             [ type TYPE ] [ scope SCOPE ]
 >
 > TYPE := { unicast | ~~local~~ | broadcast | multicast | ~~throw~~ |
@@ -270,10 +262,10 @@ List routes using a specific gateway:
 ip route show via 192.168.0.1
 ```
 
-List routes using a specific network interface:
+List IPv6 routes using a specific network interface:
 
 ```shell
-ip route show dev en1
+ip -6 route show dev en1
 ```
 
 List routes for multicast:
@@ -288,10 +280,16 @@ List availabe routes to reach specific network:
 ip route show to match 192.168.1.0/24
 ```
 
+List IPv4 and IPv6 routes<sup>2</sup>
+
+```shell
+ip route show table all
+```
+
 #### Notes
 
 1. `iif` is not honored (is treated like `dev` and `oif`).
-2. *Route tables* are not implemented in macOS (Darwin).
+2. *Route tables* are not implemented in macOS (Darwin), but "table all" will result in show IPv4 + IPv6 routes
 
 ### `ip route add`: add new route
 ### `ip route delete`: delete route

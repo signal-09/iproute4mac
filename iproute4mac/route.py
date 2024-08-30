@@ -152,6 +152,9 @@ class _Route:
         if self._present(self._route, key):
             del self._route[key]
 
+    def get(self, key, value=None):
+        return self._route.get(key, value)
+
     def __contains__(self, other):
         return other in self._route
 
@@ -164,13 +167,17 @@ class _Route:
     def present(self, key, value=None):
         return self._present(self._route, key, value=value)
 
-    def get(self, key, value=None):
-        return self._route.get(key, value)
-
     def pop(self, key, value=None):
         if value is None:
             return self._route.pop(key)
         return self._route.pop(key, value)
+
+    def source_from(self, prefix):
+        if self._route.get("prefsrc") in prefix:
+            return True
+        if prefix.is_default and self.get("dst") in prefix:
+            return True
+        return False
 
     def dict(self, details=True):
         """

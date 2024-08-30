@@ -108,9 +108,7 @@ class _Route:
 
         # scope
         scope = "link"
-        if gateway and re.match(LLADDR, gateway):
-            pass
-        elif gateway and (gateway.startswith("link#") or gateway == dev):
+        if gateway and (re.match(LLADDR, gateway) or gateway.startswith("link#") or gateway == dev):
             gateway = None
         elif _RTF_BLACKHOLE in flags:
             scope = "global"

@@ -515,7 +515,7 @@ def iproute_list(argv):
             else:
                 via = next_arg(argv)
             prefix = get_prefix(via, family)
-            entries.set([e for e in entries if "gateway" in e and prefix in e["gateway"]])
+            entries.set([e for e in entries if e.present("gateway") and prefix in e["gateway"]])
             delete_keys(entries, "gateway")
         elif strcmp(opt, "src"):
             prefix = get_prefix(next_arg(argv), OPTION["preferred_family"])
@@ -547,16 +547,16 @@ def iproute_list(argv):
             if matches(opt, "root"):
                 opt = next_arg(argv)
                 prefix = get_prefix(opt, OPTION["preferred_family"])
-                entries.set([e for e in entries if "dst" in e and e["dst"] in prefix])
+                entries.set([e for e in entries if e.present("dst") and e["dst"] in prefix])
             elif matches(opt, "match"):
                 opt = next_arg(argv)
                 prefix = get_prefix(opt, OPTION["preferred_family"])
-                entries.set([e for e in entries if "dst" in e and prefix in e["dst"]])
+                entries.set([e for e in entries if e.present("dst") and prefix in e["dst"]])
             else:
                 if matches(opt, "exact"):
                     opt = next_arg(argv)
                 prefix = get_prefix(opt, OPTION["preferred_family"])
-                entries.set([e for e in entries if "dst" in e and prefix == e["dst"]])
+                entries.set([e for e in entries if e.present("dst") and prefix == e["dst"]])
 
     if OPTION["preferred_family"] == AF_UNSPEC:
         OPTION["preferred_family"] = AF_INET

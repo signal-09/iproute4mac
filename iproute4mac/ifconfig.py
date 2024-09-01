@@ -136,13 +136,13 @@ class _IfconfigRegEx(_Ifconfig):
     _inet = re.compile(
         rf"\tinet (?P<address>{IPV4ADDR})"
         rf"(?: --> (?P<peer>{IPV4ADDR}))?"
-        rf" netmask (?P<netmask>{IPV4MASK})"
+        r"(?:/(?P<prefixlen>\d+))?"
         rf"(?: broadcast (?P<broadcast>{IPV4ADDR}))?"
     )
     _inet6 = re.compile(
         rf"\tinet6 (?P<address>{IPV6ADDR})(?:%\w+)?"
         rf"(?: --> (?P<peer>{IPV6ADDR})(?:%\w+)?)?"
-        r" prefixlen (?P<prefixlen>\d+)"
+        r"(?:/(?P<prefixlen>\d+))?"
         r"(?: (?P<autoconf>autoconf))?"
         r"(?: (?P<secured>secured))?"
         r"(?: pltime (?P<pltime>\d+))?"
@@ -454,7 +454,7 @@ class Ifconfig:
 
     def __init__(self):
         self._interfaces = []
-        res = shell(_IFCONFIG, "-a", "-L", "-m", "-r", "-v")
+        res = shell(_IFCONFIG, "-f", "inet:cidr,inet6:cidr", "-a", "-L", "-m", "-r", "-v")
         for data in re.findall(rf"(^{IFNAME}:.*\n(?:\t.*[\n|$])*)", res, flags=re.MULTILINE):
             # for every single interface:
             self._interfaces.append(_IfconfigRegEx(data))

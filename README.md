@@ -7,6 +7,44 @@ This is a macOS network wrapper to imitate GNU/Linux [iproute2](https://wiki.lin
 
 ### Working staff
 
+Command `ip`:
+
+|   objects   | implemented | supported | note |
+| :---------: | :---------: | :-------: | ---- |
+| address     | :white_check_mark: | :white_check_mark: |
+| addrlabel   | :x: | :grey_question: | IPv6 protocol address label |
+| maddress    | :x: | :grey_question: |
+| route       | :white_check_mark: | :white_check_mark: |
+| rule        | :x: | :grey_question: | (e.g. [source based routing with FreeBSD...](https://mmacleod.ca/2011/06/source-based-routing-with-freebsd-using-multiple-routing-table/))
+| neighbor    | :white_check_mark: | :white_check_mark: | using [ARP](https://en.wikipedia.org/wiki/Address_Resolution_Protocol) for IPv4 and [NDP](https://en.wikipedia.org/wiki/Neighbor_Discovery_Protocol) for IPv6
+| ntable      | :x: | :grey_question: |
+| ntbl        | :x: | :grey_question: |
+| link        | :white_check_mark: | :white_check_mark: |
+| l2tp        | :x: | :grey_question: |
+| fou         | :x: | :grey_question: | IP-IP tunnel over UDP?
+| ila         | :x: | :grey_question: | IPv6 Identifier Locator Addressing
+| macsec      | :x: | :x: |
+| tunnel      | :x: | :white_check_mark: | [IP-IP](https://kovyrin.net/2006/03/17/how-to-create-ip-ip-tunnel-between-freebsd-and-linux/) only
+| tuntap      | :x: | :grey_question: | [Tunnelblick](https://github.com/Tunnelblick/Tunnelblick/tree/master/third_party) third party [tuntaposx](https://tuntaposx.sourceforge.net)?
+| tap         | :x: | :grey_question: | [Tunnelblick](https://github.com/Tunnelblick/Tunnelblick/tree/master/third_party) third party [tuntaposx](https://tuntaposx.sourceforge.net)?
+| token       | :x: | :grey_question: | May be related to [non-numeric IPv6 mask](https://forums.freebsd.org/threads/how-to-apply-non-numeric-mask-to-ipv6-address.69829/)?
+| tcpmetrics  | :x: | :grey_question: |
+| monitor     | :x: | :x: |
+| xfrm        | :x: | :x: |
+| mroute      | :x: | :grey_question: | See [Max OS: no multicast route for 127.0.0.1](https://issues.redhat.com/browse/JGRP-1808)
+| mrule       | :x: | :grey_question: |
+| netns       | :x: | :x: |
+| netconf     | :x: | :white_check_mark: |
+| vrf         | :x: | :grey_question: | [Virtual Routing and Forwarding](https://en.wikipedia.org/wiki/Virtual_routing_and_forwarding)
+| sr          | :x: | :grey_question: | IPv6 Segment Routing management
+| nexthop     | :x: | :grey_question: |
+| mptcp       | :x: | :x: | Multipath TCP
+| ioam        | :x: | :grey_question: | IPv6 In-situ OAM (IOAM)
+| help        | :white_check_mark: | :white_check_mark: |
+| stats       | :x: | :grey_question: |
+
+Examples:
+
 * `ip address [ list | show ]`
 * `ip address { add | change | replace | delete }`
 * `ip link [ list | show ]`

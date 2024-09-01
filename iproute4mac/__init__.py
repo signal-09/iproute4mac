@@ -1,4 +1,4 @@
-VERSION = "0.4.3"
+VERSION = "0.4.4"
 
 # socket.h
 AF_UNSPEC = 0

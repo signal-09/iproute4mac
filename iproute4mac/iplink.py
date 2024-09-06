@@ -1,16 +1,24 @@
+import re
+import sys
+
 import iproute4mac.ifconfig as ifconfig
-import iproute4mac.iplink_vlan as vlan
+import iproute4mac.iplink_bond as bond
+import iproute4mac.iplink_bridge as bridge
 import iproute4mac.iplink_feth as feth
 import iproute4mac.iplink_veth as veth
-import iproute4mac.iplink_bridge as bridge
-import iproute4mac.iplink_bond as bond
+import iproute4mac.iplink_vlan as vlan
+import iproute4mac.libc as libc
+import iproute4mac.socket as socket
+import iproute4mac.utils as utils
 
-from iproute4mac.utils import *
-from iproute4mac.ipaddress import get_ifconfig_links
+from iproute4mac import OPTION
+from iproute4mac.ifconfig import LLADDR, IFNAME
+from iproute4mac.ipaddress import get_links
+from iproute4mac.utils import matches, strcmp, next_arg
 
 
 def usage():
-    stderr("""\
+    utils.stderr("""\
 Usage: ip link add [link DEV | parentdev NAME] [ name ] NAME
                    [ txqueuelen PACKETS ]
                    [ address LLADDR ]
@@ -82,7 +90,7 @@ TYPE := { amt | bareudp | bond | bond_slave | bridge | bridge_slave |
           netkit | nlmon | pfcp | rmnet | sit | team | team_slave |
           vcan | feth | vlan | vrf | vti | vxcan | vxlan | wwan |
           xfrm | virt_wifi }""")
-    exit(EXIT_ERROR)
+    exit(libc.EXIT_ERROR)
 
 
 class LinkType:
@@ -127,8 +135,8 @@ def iplink_add(dev, link_type, args, links):
 
 def iplink_del(dev, link_type, args, links):
     if not (link := next((l for l in links if l["ifname"] == dev), None)):
-        stderr(f'Cannot find device "{dev}"')
-        exit(EXIT_FAILURE)
+        utils.stderr(f'Cannot find device "{dev}"')
+        exit(libc.EXIT_FAILURE)
 
     if not link_type:
         if kind := link.get("linkinfo", {}).get("info_kind"):
@@ -136,13 +144,13 @@ def iplink_del(dev, link_type, args, links):
     if link_type:
         link_type.delete(link, args)
     elif res := ifconfig.run(dev, "destroy"):
-        stdout(res, optional=True)
+        utils.stdout(res, optional=True)
 
 
 def iplink_set(dev, link_type, args, links):
     if not (link := next((l for l in links if l["ifname"] == dev), None)):
-        stderr(f'Cannot find device "{dev}"')
-        exit(EXIT_FAILURE)
+        utils.stderr(f'Cannot find device "{dev}"')
+        exit(libc.EXIT_FAILURE)
 
     res = ""
     for opt, value in args.items():
@@ -170,7 +178,7 @@ def iplink_set(dev, link_type, args, links):
                 link_type.free(link, master)
 
     if res:
-        stdout(res, optional=True)
+        utils.stdout(res, optional=True)
 
     if link_type:
         link_type.set(dev, args)
@@ -178,9 +186,9 @@ def iplink_set(dev, link_type, args, links):
 
 def iplink_modify(cmd, argv):
     # hide unrequested (but needed) system command from logs
-    old_options = options_override({"show_details": True, "verbose": -1})
+    old_options = utils.options_override({"show_details": True, "verbose": -1})
     links = get_iplinks()
-    options_restore(old_options)
+    utils.options_restore(old_options)
 
     dev = None
     link_type = None
@@ -192,119 +200,121 @@ def iplink_modify(cmd, argv):
         elif strcmp(opt, "name"):
             name = next_arg(argv)
             if "name" in modifiers:
-                duparg("name", name)
+                utils.duparg("name", name)
             if not re.match(f"{IFNAME}$", name):
-                invarg('"name" not a valid ifname', name)
+                utils.invarg('"name" not a valid ifname', name)
             modifiers["name"] = name
             if not dev:
                 dev = name
         elif strcmp(opt, "index"):
             index = next_arg(argv)
             # if "index" in modifiers:
-            #     duparg("index", opt)
+            #     utils.duparg("index", opt)
             try:
                 assert 0 <= int(index) < 2**16
             except (ValueError, AssertionError):
-                invarg('Invalid "index" value', index)
-            do_notimplemented(opt)
+                utils.invarg('Invalid "index" value', index)
+            utils.do_notimplemented(opt)
         elif matches(opt, "link"):
             opt = next_arg(argv)
             if not links.exist(opt):
-                invarg("Device does not exist", opt)
+                utils.invarg("Device does not exist", opt)
             modifiers["link"] = opt
         elif matches(opt, "address"):
             lladdr = next_arg(argv)
             if not re.match(f"{LLADDR}$", lladdr):
-                stderr(f'"{lladdr}" is invalid lladdr.')
-                exit(EXIT_ERROR)
+                utils.stderr(f'"{lladdr}" is invalid lladdr.')
+                exit(libc.EXIT_ERROR)
             modifiers["address"] = lladdr
         elif matches(opt, "broadcast") or strcmp(opt, "brd"):
             lladdr = next_arg(argv)
             if not re.match(f"{LLADDR}$", lladdr):
-                stderr(f'"{lladdr}" is invalid lladdr.')
-                exit(EXIT_ERROR)
-            do_notimplemented(opt)
+                utils.stderr(f'"{lladdr}" is invalid lladdr.')
+                exit(libc.EXIT_ERROR)
+            utils.do_notimplemented(opt)
         elif matches(opt, "txqueuelen", "txqlen") or strcmp(opt, "qlen"):
             qlen = next_arg(argv)
-            hint(f'per link queue length not supported, try "sysctl -w net.link.generic.system.sndq_maxlen={qlen}" instead.')
+            utils.hint(
+                f'per link queue length not supported, try "sysctl -w net.link.generic.system.sndq_maxlen={qlen}" instead.'
+            )
             if "txqlen" in modifiers:
-                duparg("txqueuelen", qlen)
+                utils.duparg("txqueuelen", qlen)
             try:
                 assert 0 <= int(qlen) < 2**16
             except (ValueError, AssertionError):
-                invarg('Invalid "txqueuelen" value', qlen)
-            do_notimplemented(opt)
+                utils.invarg('Invalid "txqueuelen" value', qlen)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "mtu"):
             mtu = next_arg(argv)
             if "mtu" in modifiers:
-                duparg("mtu", mtu)
+                utils.duparg("mtu", mtu)
             try:
                 assert 0 <= int(mtu) < 2**16
             except (ValueError, AssertionError):
-                invarg('Invalid "mtu" value', mtu)
+                utils.invarg('Invalid "mtu" value', mtu)
             modifiers["mtu"] = mtu
         elif strcmp(opt, "xdpgeneric", "xdpdrv", "xdpoffload", "xdp"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "netns"):
             netns = next_arg(argv)
             try:
                 assert 0 <= int(netns) < 2**16
             except (ValueError, AssertionError):
-                invarg('Invalid "netns" value', netns)
-            do_notimplemented(opt)
+                utils.invarg('Invalid "netns" value', netns)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "multicast", "allmulticast"):
             multicast = next_arg(argv)
             if not strcmp(multicast, "on", "off"):
-                on_off(opt, multicast)
-            do_notimplemented(opt)
+                utils.on_off(opt, multicast)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "promisc"):
             promisc = next_arg(argv)
             if not strcmp(promisc, "on", "off"):
-                on_off(opt, promisc)
-            do_notimplemented(opt)
+                utils.on_off(opt, promisc)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "trailers"):
             trailers = next_arg(argv)
             if not strcmp(trailers, "on", "off"):
-                on_off(opt, trailers)
-            do_notimplemented(opt)
+                utils.on_off(opt, trailers)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "arp"):
             arp = next_arg(argv)
             if not strcmp(arp, "on", "off"):
-                on_off(opt, arp)
-            modifiers["arp"] = on_off_switch(opt, arp)
+                utils.on_off(opt, arp)
+            modifiers["arp"] = utils.on_off_switch(opt, arp)
         elif strcmp(opt, "carrier"):
             carrier = next_arg(argv)
             if not strcmp(carrier, "on", "off"):
-                on_off(opt, carrier)
-            do_notimplemented(opt)
+                utils.on_off(opt, carrier)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "vf"):
             vf = next_arg(argv)
             try:
                 assert 0 <= int(vf) < 2**16
             except (ValueError, AssertionError):
-                invarg('Invalid "vf" value', mtu)
-            do_notimplemented(opt)
+                utils.invarg('Invalid "vf" value', mtu)
+            utils.do_notimplemented(opt)
         elif matches(opt, "master"):
             opt = next_arg(argv)
             if not links.exist(opt):
-                invarg("Device does not exist", opt)
+                utils.invarg("Device does not exist", opt)
             modifiers["master"] = opt
         elif strcmp(opt, "vrf"):
             vrf = next_arg(argv)
             if not links.exist(vrf):
-                invarg("Not a valid VRF name", vrf)
+                utils.invarg("Not a valid VRF name", vrf)
             # if not is_vrf(vrf):
-            #     invarg("Not a valid VRF name", vrf)
+            #     utils.invarg("Not a valid VRF name", vrf)
             # links = [l for l in links if l.get("master") == vrf)]
             # FIXME: https://wiki.netunix.net/freebsd/network/vrf/
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "nomaster"):
             modifiers["nomaster"] = True
         elif matches(opt, "dynamic"):
             dynamic = next_arg(argv)
             if not strcmp(dynamic, "on", "off"):
-                on_off(opt, dynamic)
-            do_notimplemented(opt)
+                utils.on_off(opt, dynamic)
+            utils.do_notimplemented(opt)
         elif matches(opt, "type"):
             opt = next_arg(argv)
             if matches(opt, "help"):
@@ -312,99 +322,105 @@ def iplink_modify(cmd, argv):
             try:
                 link_type = LinkType(opt)
             except NotImplementedError:
-                invarg('"type" value is invalid', opt)
+                utils.invarg('"type" value is invalid', opt)
             if "name" not in modifiers:
                 modifiers["name"] = opt
             elif not matches(opt, modifiers["name"]):
-                hint(f'arbitrary name "{modifiers["name"]}" not supported, try with "{opt}X"')
+                utils.hint(f'arbitrary name "{modifiers["name"]}" not supported, try with "{opt}X"')
             break
         elif matches(opt, "alias"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "group"):
             group = next_arg(argv)
             try:
                 assert 0 <= int(group) < 2**8
             except (ValueError, AssertionError):
-                invarg('Invalid "group" value', group)
-            do_notimplemented(opt)
+                utils.invarg('Invalid "group" value', group)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "mode"):
             mode = next_arg(argv)
             if not strcmp(mode, "default", "dormant"):
-                invarg("Invalid link mode", mode)
-            do_notimplemented(opt)
+                utils.invarg("Invalid link mode", mode)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "state"):
             state = next_arg(argv)
-            if not strcmp(state, "unknown", "notpresent", "down", "lowerlayerdown", "testing", "dormant", "up"):
-                invarg("Invalid operstate", state)
-            do_notimplemented(opt)
+            if not strcmp(
+                state, "unknown", "notpresent", "down", "lowerlayerdown", "testing", "dormant", "up"
+            ):
+                utils.invarg("Invalid operstate", state)
+            utils.do_notimplemented(opt)
         elif matches(opt, "numtxqueues"):
             qlen = next_arg(argv)
             try:
                 assert 0 <= int(qlen) < 2**16
             except (ValueError, AssertionError):
-                invarg('Invalid "numtxqueues" value', qlen)
-            hint(f'per link queue length not supported, try "sysctl -w net.link.generic.system.sndq_maxlen={qlen}" instead.')
-            do_notimplemented(opt)
+                utils.invarg('Invalid "numtxqueues" value', qlen)
+            utils.hint(
+                f'per link queue length not supported, try "sysctl -w net.link.generic.system.sndq_maxlen={qlen}" instead.'
+            )
+            utils.do_notimplemented(opt)
         elif matches(opt, "numrxqueues"):
             qlen = next_arg(argv)
             try:
                 assert 0 <= int(qlen) < 2**16
             except (ValueError, AssertionError):
-                invarg('Invalid "numrxqueues" value', qlen)
-            hint(f'per link queue length not supported, try "sysctl -w net.link.generic.system.rcvq_maxlen={qlen}" instead.')
-            do_notimplemented(opt)
+                utils.invarg('Invalid "numrxqueues" value', qlen)
+            utils.hint(
+                f'per link queue length not supported, try "sysctl -w net.link.generic.system.rcvq_maxlen={qlen}" instead.'
+            )
+            utils.do_notimplemented(opt)
         elif matches(opt, "addrgenmode"):
             mode = next_arg(argv)
             if not strcmp(mode, "eui64", "none", "stable_secret", "random"):
-                invarg("Invalid address generation mode", mode)
-            do_notimplemented(opt)
+                utils.invarg("Invalid address generation mode", mode)
+            utils.do_notimplemented(opt)
         elif matches(opt, "link-netns"):
             netns = next_arg(argv)
             try:
                 assert 0 <= int(netns) < 2**16
             except (ValueError, AssertionError):
-                invarg('Invalid "link-netns" value', netns)
-            do_notimplemented(opt)
+                utils.invarg('Invalid "link-netns" value', netns)
+            utils.do_notimplemented(opt)
         elif matches(opt, "link-netnsid"):
             netns = next_arg(argv)
             try:
                 assert 0 <= int(netns) < 2**16
             except (ValueError, AssertionError):
-                invarg('Invalid "link-netnsid" value', netns)
-            do_notimplemented(opt)
+                utils.invarg('Invalid "link-netnsid" value', netns)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "protodown"):
             down = next_arg(argv)
             if not strcmp(down, "on", "off"):
-                on_off(opt, down)
-            do_notimplemented(opt)
+                utils.on_off(opt, down)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "protodown_reason"):
             preason = next_arg(argv)
             try:
                 assert 0 <= int(preason) < 2**32
             except (ValueError, AssertionError):
-                invarg("invalid protodown reason", preason)
+                utils.invarg("invalid protodown reason", preason)
             down = next_arg(argv)
             if not strcmp(down, "on", "off"):
-                on_off(opt, down)
-            do_notimplemented(opt)
+                utils.on_off(opt, down)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "gso_max_size", "gso_max_segs", "gro_max_size"):
             max_size = next_arg(argv)
             try:
                 assert 0 <= int(max_size) < 2**32
             except (ValueError, AssertionError):
-                invarg('Invalid "{opt}" value', max_size)
-            do_notimplemented(opt)
+                utils.invarg('Invalid "{opt}" value', max_size)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "parentdev"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         else:
             if matches(opt, "help"):
                 usage()
             if strcmp(opt, "dev"):
                 opt = next_arg(argv)
             if dev or opt != modifiers.get("name", opt):
-                duparg2("dev", opt)
+                utils.duparg2("dev", opt)
             if not re.match(f"{IFNAME}$", opt):
-                invarg('"dev" not a valid ifname', opt)
+                utils.invarg('"dev" not a valid ifname', opt)
             dev = opt
 
     if dev:
@@ -416,19 +432,19 @@ def iplink_modify(cmd, argv):
         link_type.parse(argv, modifiers)
 
     if not dev:
-        stderr('Not enough information: "dev" argument is required.')
-        exit(EXIT_ERROR)
+        utils.stderr('Not enough information: "dev" argument is required.')
+        exit(libc.EXIT_ERROR)
     if argv:
         opt = next_arg(argv)
         if matches(opt, "help"):
             usage()
-        stderr(f'Garbage instead of arguments "{opt} ...". Try "ip link help".')
-        exit(EXIT_ERROR)
+        utils.stderr(f'Garbage instead of arguments "{opt} ...". Try "ip link help".')
+        exit(libc.EXIT_ERROR)
 
     if matches(cmd, "add"):
         if not link_type:
-            stderr('Not enough information: "type" argument is required')
-            exit(EXIT_ERROR)
+            utils.stderr('Not enough information: "type" argument is required')
+            exit(libc.EXIT_ERROR)
         iplink_add(dev, link_type, modifiers, links)
     elif matches(cmd, "set", "change"):
         iplink_set(dev, link_type, modifiers, links)
@@ -438,22 +454,22 @@ def iplink_modify(cmd, argv):
     elif matches(cmd, "delete"):
         iplink_del(dev, link_type, modifiers, links)
     else:
-        do_notimplemented()
+        utils.do_notimplemented()
 
-    return EXIT_SUCCESS
+    return libc.EXIT_SUCCESS
 
 
 def get_iplinks(argv=[]):
-    links = get_ifconfig_links(argv, usage)
+    links = get_links(argv, usage)
     for link in links:
         del link["addr_info"]
     return links
 
 
 def iplink_list(argv):
-    OPTION["preferred_family"] = AF_PACKET
-    output(get_iplinks(argv))
-    return EXIT_SUCCESS
+    OPTION["preferred_family"] = socket._AF_PACKET
+    utils.output(get_iplinks(argv))
+    return libc.EXIT_SUCCESS
 
 
 def do_iplink(argv):
@@ -466,13 +482,13 @@ def do_iplink(argv):
     elif matches(cmd, "show", "lst", "list"):
         return iplink_list(argv)
     elif matches(cmd, "xstats"):
-        return do_notimplemented()
+        return utils.do_notimplemented()
     elif matches(cmd, "afstats"):
-        return do_notimplemented()
+        return utils.do_notimplemented()
     elif matches(cmd, "property"):
-        return do_notimplemented()
+        return utils.do_notimplemented()
     elif matches(cmd, "help"):
         return usage()
 
-    stderr(f'Command "{cmd}" is unknown, try "ip link help".')
-    exit(EXIT_ERROR)
+    utils.stderr(f'Command "{cmd}" is unknown, try "ip link help".')
+    exit(libc.EXIT_ERROR)

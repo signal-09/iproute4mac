@@ -1,5 +1,5 @@
 show-fixes = true
-line-length = 128
+line-length = 100
 
 [lint]
 ignore = ["E741", "F401", "F403", "F405"]

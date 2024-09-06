@@ -1,11 +1,11 @@
 import iproute4mac
 import iproute4mac.libc as libc
 
-from iproute4mac.ip import OBJS
+from iproute4mac.bridge import OBJS
 from iproute4mac.utils import do_notimplemented
 
 
-_CMD = "ip"
+_CMD = "bridge"
 
 
 def test_version(script_runner):

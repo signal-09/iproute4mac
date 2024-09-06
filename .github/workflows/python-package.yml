@@ -131,7 +131,6 @@ jobs:
     runs-on: ubuntu-latest
     needs:
     - pypi-publish
-    - test-pypi-publish
 
     steps:
     - name: Update Homebrew releases

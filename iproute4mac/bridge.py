@@ -1,6 +1,19 @@
 #!/usr/bin/env python3
 
-from iproute4mac.utils import *
+import iproute4mac
+import os
+import sys
+
+import iproute4mac.brlink as brlink
+import iproute4mac.libc as libc
+import iproute4mac.socket as socket
+import iproute4mac.utils as utils
+
+from iproute4mac import OPTION
+from iproute4mac.utils import matches, strcmp, matches_color
+
+
+OPTION["uid"] = os.getuid()
 
 
 def do_help(argv=[]):
@@ -8,24 +21,24 @@ def do_help(argv=[]):
 
 
 def usage():
-    stderr("""\
+    utils.stderr("""\
 Usage: bridge [ OPTIONS ] OBJECT { COMMAND | help }
        bridge [ -force ] -batch filename
 where  OBJECT := { link | fdb | mdb | vlan | vni | monitor }
        OPTIONS := { -V[ersion] | -s[tatistics] | -d[etails] |
                     -o[neline] | -t[imestamp] | -n[etns] name |
                     -com[pressvlans] -c[olor] -p[retty] -j[son] }""")
-    exit(EXIT_ERROR)
+    exit(libc.EXIT_ERROR)
 
 
 # Implemented objects
 OBJS = [
-    ("link", do_notimplemented),
-    ("fdb", do_notimplemented),
-    ("mdb", do_notimplemented),
-    ("vlan", do_notimplemented),
-    ("vni", do_notimplemented),
-    ("monitor", do_notimplemented),
+    ("link", brlink.do_brlink),
+    ("fdb", utils.do_notimplemented),
+    ("mdb", utils.do_notimplemented),
+    ("vlan", utils.do_notimplemented),
+    ("vni", utils.do_notimplemented),
+    ("monitor", utils.do_notimplemented),
     ("help", do_help),
 ]
 
@@ -36,14 +49,14 @@ def do_obj(argv):
         if o.startswith(obj):
             return f(argv)
 
-    stderr(f'Object "{obj}" is unknown, try "bridge help".')
-    return EXIT_FAILURE
+    utils.stderr(f'Object "{obj}" is unknown, try "bridge help".')
+    return libc.EXIT_FAILURE
 
 
 def main():
     if sys.platform != "darwin":
-        stderr("Unupported OS.")
-        exit(EXIT_ERROR)
+        utils.stderr("Unupported OS.")
+        exit(libc.EXIT_ERROR)
 
     batch_file = None
     argv = sys.argv[1:]
@@ -61,8 +74,8 @@ def main():
         if matches(opt, "-help"):
             usage()
         elif matches(opt, "-Version"):
-            print(f"bridge wrapper, iproute4mac-{VERSION}")
-            exit(EXIT_SUCCESS)
+            print(f"bridge wrapper, iproute4mac-{iproute4mac.VERSION}")
+            exit(libc.EXIT_SUCCESS)
         elif matches(opt, "-stats".startswith(opt) or "-statistics"):
             OPTION["show_stats"] = True
         elif matches(opt, "-details"):
@@ -75,18 +88,18 @@ def main():
             try:
                 opt = argv.pop(0)
             except IndexError:
-                missarg("family type")
+                utils.missarg("family type")
             if strcmp(opt, "help"):
                 usage()
-            OPTION["preferred_family"] = read_family(opt)
-            if OPTION["preferred_family"] == AF_UNSPEC:
-                invarg("invalid protocol family", opt)
+            OPTION["preferred_family"] = socket.read_family(opt)
+            if OPTION["preferred_family"] == socket._AF_UNSPEC:
+                utils.invarg("invalid protocol family", opt)
         elif strcmp(opt, "-4"):
-            OPTION["preferred_family"] = AF_INET
+            OPTION["preferred_family"] = socket._AF_INET
         elif strcmp(opt, "-6"):
-            OPTION["preferred_family"] = AF_INET6
+            OPTION["preferred_family"] = socket._AF_INET6
         elif matches(opt, "-netns"):
-            do_notimplemented()
+            utils.do_notimplemented()
         elif matches_color(opt):
             # silently ignore not implemented color option
             pass
@@ -102,23 +115,25 @@ def main():
             try:
                 batch_file = argv.pop(0)
             except IndexError:
-                missarg("batch file")
+                utils.missarg("batch file")
         elif matches(opt, "-verbose", "-vvv"):
-            while opt[1] == "v" and OPTION["verbose"] < LOG_DEBUG:
+            while opt[1] == "v" and OPTION["verbose"] < utils.LOG_DEBUG:
                 OPTION["verbose"] += 1
                 if len(opt) <= 2:
                     break
                 opt = opt[1:]
         elif matches(opt, "-silent"):
-            OPTION["verbose"] = LOG_STDERR
+            OPTION["verbose"] = utils.LOG_STDERR
         elif matches(opt, "-quiet"):
             OPTION["verbose"] = -1
+        elif matches(opt, "-debug"):
+            pass
         else:
-            stderr(f'Option "{opt}" is unknown, try "bridge help".')
-            exit(EXIT_ERROR)
+            utils.stderr(f'Option "{opt}" is unknown, try "bridge help".')
+            exit(libc.EXIT_ERROR)
 
     if batch_file:
-        do_notimplemented()
+        utils.do_notimplemented()
 
     if argv:
         return do_obj(argv)

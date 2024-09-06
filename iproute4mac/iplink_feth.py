@@ -1,6 +1,8 @@
 import iproute4mac.ifconfig as ifconfig
+import iproute4mac.libc as libc
+import iproute4mac.utils as utils
 
-from iproute4mac.utils import *
+from iproute4mac.utils import matches, strcmp, next_arg
 
 
 # https://opensource.apple.com/source/xnu/xnu-7195.81.3/bsd/net/if_fake.c.auto.html
@@ -8,10 +10,10 @@ from iproute4mac.utils import *
 
 
 def explain():
-    stderr("""\
+    utils.stderr("""\
 Usage: ip link <options> type feth [peer <options>]
 To get <options> type 'ip link add help""")
-    exit(EXIT_ERROR)
+    exit(libc.EXIT_ERROR)
 
 
 def parse(argv, args):
@@ -20,21 +22,21 @@ def parse(argv, args):
         if strcmp(opt, "peer"):
             args["peer"] = next_arg(argv)
         else:
-            stderr(f'feth: unknown command "{opt}"?')
+            utils.stderr(f'feth: unknown command "{opt}"?')
             explain()
 
 
 def add(dev, args):
     peer = args.pop("peer", None)
     if res := ifconfig.run(dev, "create"):
-        stdout(res, optional=True)
+        utils.stdout(res, optional=True)
         dev = res.rstrip()
 
     try:
         if peer and (res := ifconfig.run(peer, "create", fatal=False)):
             peer = None
             assert isinstance(res, str)
-            stdout(res, optional=True)
+            utils.stdout(res, optional=True)
             peer = res.rstrip()
         if peer and (res := ifconfig.run(dev, "peer", peer, fatal=False)):
             assert isinstance(res, str)

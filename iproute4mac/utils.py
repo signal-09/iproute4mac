@@ -1,13 +1,14 @@
 import json
-import os
 import re
-import socket
 import subprocess
 import sys
 
+import iproute4mac.libc as libc
+import iproute4mac.socket as socket
+
 from _ctypes import PyObj_FromPtr
 
-from iproute4mac import *
+from iproute4mac import OPTION
 from iproute4mac.prefix import Prefix
 
 
@@ -19,8 +20,6 @@ LOG_WARN = 3
 LOG_INFO = 4
 LOG_DEBUG = 5
 LOG_LABEL = (None, "Hint", "Error", "Warning", "Info", "Debug")
-
-OPTION["uid"] = os.getuid()
 
 
 def stdout(*args, sep="", end="", optional=False):
@@ -39,7 +38,7 @@ def stderr(text, log_level=LOG_STDERR):
 
 def error(text):
     stderr(text, log_level=LOG_ERROR)
-    exit(EXIT_ERROR)
+    exit(libc.EXIT_ERROR)
 
 
 def warn(text):
@@ -84,14 +83,16 @@ def on_off_switch(key, arg):
 
 def incomplete_command():
     stderr('Command line is not complete. Try option "help"')
-    exit(EXIT_ERROR)
+    exit(libc.EXIT_ERROR)
 
 
 def output(obj):
     if OPTION["json"]:
-        stdout(json_dumps(obj.dict(details=OPTION["show_details"])), end="\n")
+        res = json_dumps(obj.dict(details=OPTION["show_details"]))
     else:
-        stdout(obj.str(details=OPTION["show_details"]))
+        res = obj.str(details=OPTION["show_details"])
+    if res:
+        stdout(res, end="\n")
 
 
 def next_arg(argv):
@@ -101,43 +102,8 @@ def next_arg(argv):
         incomplete_command()
 
 
-def read_family(name):
-    for f, n in ADDRESS_FAMILIES:
-        if name == n:
-            return f
-    return AF_UNSPEC
-
-
-def family_name(family):
-    for f, n in ADDRESS_FAMILIES:
-        if family == f:
-            return n
-    return "???"
-
-
-def family_name_verbose(family):
-    if family == AF_UNSPEC:
-        return "any value"
-    return family_name(family)
-
-
-def af_bit_len(af):
-    if af == AF_INET6:
-        return 128
-    elif af == AF_INET:
-        return 32
-    elif af == AF_MPLS:
-        return 20
-    else:
-        return 0
-
-
-def af_byte_len(af):
-    return int(af_bit_len(af) / 8)
-
-
-def mask2bits(mask):
-    return sum([bit_count(int(octet)) for octet in mask.split(".")])
+def empty(value):
+    return value is None or (not isinstance(value, int | float | complex) and not value)
 
 
 def recurse_in(data, attr, val):
@@ -157,6 +123,25 @@ def recurse_in(data, attr, val):
     return False
 
 
+def find_item(data, key, value=None, recurse=True, strict=False):
+    if key in data:
+        if value is not None:
+            return data[key] == value
+        if strict:
+            return bool(data[key])
+        return data[key] is not None
+    for k, v in data.items():
+        if recurse and isinstance(v, dict):
+            return find_item(v, key, value=value, strict=strict)
+    return False
+
+
+def dict_format(data, string, *fields, default=None):
+    if not data or not fields or empty(data.get(fields[0], default)):
+        return ""
+    return string.format(*[data.get(field, default) for field in fields])
+
+
 def delete_keys(data, *args):
     for entry in data:
         for arg in args:
@@ -168,8 +153,26 @@ def bit_count(self):
     return bin(self).count("1")
 
 
-def netmask_to_length(mask):
-    return bit_count(int(mask, 16))
+def get_addr(name, family):
+    if family == socket._AF_MPLS:
+        error("MPLS protocol not supported.")
+    addr = Prefix(name, family=family)
+    if family in (socket._AF_UNSPEC, socket._AF_PACKET) or addr.family == family:
+        return addr
+
+    error(f'{socket.family_name_verbose(family)} address is expected rather than "{name}".')
+
+
+def get_prefix(name, family):
+    if family == socket._AF_PACKET:
+        error(f'"{name}" may be inet prefix, but it is not allowed in this context.')
+
+    try:
+        prefix = get_addr(name, family)
+    except ValueError:
+        error(f'{socket.family_name_verbose(family)} prefix is expected rather than "{name}".')
+
+    return prefix
 
 
 def ref(obj_id):
@@ -313,28 +316,6 @@ def shell(*args, fatal=True):
         if cmd.stdout:
             debug(f"STDOUT\n{cmd.stdout}^^^ STDOUT ^^^")
     return cmd.stdout
-
-
-def get_addr(name, family):
-    if family == AF_MPLS:
-        error("MPLS protocol not supported.")
-    addr = Prefix(name, family=family)
-    if family in (AF_UNSPEC, AF_PACKET) or addr.family == family:
-        return addr
-
-    error(f'{family_name_verbose(family)} address is expected rather than "{name}".')
-
-
-def get_prefix(name, family):
-    if family == AF_PACKET:
-        error(f'"{name}" may be inet prefix, but it is not allowed in this context.')
-
-    try:
-        prefix = get_addr(name, family)
-    except ValueError:
-        error(f'{family_name_verbose(family)} prefix is expected rather than "{name}".')
-
-    return prefix
 
 
 def get_prefsrc(host):

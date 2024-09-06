@@ -26,7 +26,6 @@ Command `ip`:
 | macsec      | :x: | :x: |
 | tunnel      | :x: | :white_check_mark: | [IP-IP](https://kovyrin.net/2006/03/17/how-to-create-ip-ip-tunnel-between-freebsd-and-linux/) only
 | tuntap      | :x: | :grey_question: | [Tunnelblick](https://github.com/Tunnelblick/Tunnelblick/tree/master/third_party) third party [tuntaposx](https://tuntaposx.sourceforge.net)?
-| tap         | :x: | :grey_question: | [Tunnelblick](https://github.com/Tunnelblick/Tunnelblick/tree/master/third_party) third party [tuntaposx](https://tuntaposx.sourceforge.net)?
 | token       | :x: | :grey_question: | May be related to [non-numeric IPv6 mask](https://forums.freebsd.org/threads/how-to-apply-non-numeric-mask-to-ipv6-address.69829/)?
 | tcpmetrics  | :x: | :grey_question: |
 | monitor     | :x: | :x: |

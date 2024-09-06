@@ -36,7 +36,12 @@ def test_ip_route_show(script_runner):
         ("ip -6 route show", 0, "fe80::/64", r"^$"),
         (f"ip route show dev {_EN}", 0, r"\n", r"^$"),
         ("ip route show src 127.0.0.1", 0, "127.0.0.0/8 via 127.0.0.1 dev lo0 proto static", r"^$"),
-        ("ip route show src 127.0.0.0/8", 0, "127.0.0.0/8 via 127.0.0.1 dev lo0 proto static src 127.0.0.1", r"^$"),
+        (
+            "ip route show src 127.0.0.0/8",
+            0,
+            "127.0.0.0/8 via 127.0.0.1 dev lo0 proto static src 127.0.0.1",
+            r"^$",
+        ),
         ("ip route show to default", 0, f"^default via .* dev {_EN}", r"^$"),
         (f"ip route show to root {_ROOT}", 0, f"{_NET} dev lo0", r"^$"),
         (f"ip route show to match {_MATCH}", 0, f"{_NET} dev lo0", r"^$"),

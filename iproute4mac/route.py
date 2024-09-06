@@ -1,6 +1,11 @@
-import iproute4mac.ifconfig as ifconfig
+import re
 
-from iproute4mac.utils import *
+import iproute4mac.ifconfig as ifconfig
+import iproute4mac.socket as socket
+import iproute4mac.utils as utils
+
+from iproute4mac.ifconfig import IPV4ADDR, IPV6ADDR, LLADDR, IFNAME
+from iproute4mac.prefix import Prefix
 
 
 _NETSTAT = "netstat"
@@ -68,7 +73,7 @@ _ROUTE_GET_DETAIL_FIELDS = ["metrics", "table"]
 
 
 def run(*argv, fatal=True):
-    return shell(_ROUTE, *argv, fatal=fatal)
+    return utils.shell(_ROUTE, *argv, fatal=fatal)
 
 
 def get_rtn(name):
@@ -117,7 +122,7 @@ class _Route:
         else:
             scope = "global"
             gateway = Prefix(gateway)
-            if dst.family == AF_UNSPEC:
+            if dst.family == socket._AF_UNSPEC:
                 dst.family = gateway.family
 
         # protocol
@@ -140,6 +145,12 @@ class _Route:
             "flags": [],
         }
 
+    def __contains__(self, other):
+        return other in self._route
+
+    def __str__(self):
+        return self.str()
+
     def __getitem__(self, key):
         return self._route.get(key)
 
@@ -147,23 +158,14 @@ class _Route:
         self._route[key] = value
 
     def __delitem__(self, key):
-        if self._present(self._route, key):
+        if key in self._route:
             del self._route[key]
 
     def get(self, key, value=None):
         return self._route.get(key, value)
 
-    def __contains__(self, other):
-        return other in self._route
-
-    @staticmethod
-    def _present(data, key, value=None):
-        if value is None:
-            return key in data and data[key] is not None
-        return data.get[key] == value
-
     def present(self, key, value=None):
-        return self._present(self._route, key, value=value)
+        return utils.find_item(self._route, key, value=value)
 
     def pop(self, key, value=None):
         if value is None:
@@ -214,7 +216,7 @@ class _Route:
             res += f" scope {route['scope']}"
         if "prefsrc" in route:
             res += f" src {repr(route['prefsrc'])}"
-        return res + "\n"
+        return res
 
 
 class Routes:
@@ -230,27 +232,35 @@ class Routes:
     )
 
     def __init__(self):
-        res = shell(_NETSTAT, "-n", "-r")
+        res = utils.shell(_NETSTAT, "-n", "-r")
         links = ifconfig.Ifconfig()
+        inet4 = [a["address"] for i in links for a in i["inet"]]
+        inet6 = [a["address"] for i in links for a in i["inet6"]]
         self._routes = []
         for route in self._route.finditer(res):
             dst, prefix, gateway, flags, dev, expire = route.groups()
             if _RTF_WASCLONED in flags:
-                debug(f"Skip cloned rotue: {route.group()}")
+                utils.debug(f"Skip cloned rotue: {route.group()}")
                 continue
             if _RTF_PROXY in flags:
-                debug(f"Skip proxy rotue: {route.group()}")
+                utils.debug(f"Skip proxy rotue: {route.group()}")
                 continue
             if dst == gateway:
-                debug(f"Skip self rotue: {route.group()}")
+                utils.debug(f"Skip self rotue: {route.group()}")
                 continue
             dst = Prefix(f"{dst}/{prefix}", pack=True) if prefix is not None else Prefix(dst)
             if not dst.is_default and not dst.is_host:
-                addr_info = next((l["addr_info"] for l in links if l.ifname == dev and l.present("addr_info")), [])
-                src = next((a["local"] for a in addr_info if a.get("local") in dst), None)
+                src = next((a for a in inet4 + inet6 if a in dst), None)
             else:
                 src = None
             self._routes.append(_Route(dst, prefix, gateway, flags, dev, expire, src))
+
+    def __iter__(self):
+        for entry in self._routes:
+            yield entry
+
+    def __str__(self):
+        return "\n".join(map(str, self._routes))
 
     def __len__(self):
         return len(self._routes)
@@ -270,13 +280,14 @@ class Routes:
         """
         List route dictiornaries
         """
-        return [r.dict(details=details) for r in self._routes if details or not re.match(LLADDR, str(r["gateway"]))]
+        return [
+            r.dict(details=details)
+            for r in self._routes
+            if details or not re.match(LLADDR, str(r["gateway"]))
+        ]
 
     def str(self, details=True):
-        res = ""
-        for r in self._routes:
-            res += r.str(details=details)
-        return res
+        return "\n".join([entry.str(details=details) for entry in self._routes])
 
 
 class _RouteGet:
@@ -305,7 +316,22 @@ class _RouteGet:
         route = self._route_get.search(data)
         if not route:
             return
-        to, dst, mask, gateway, dev, flags, recvpipe, sendpipe, ssthresh, rtt, rttvar, hopcount, mtu, expire = route.groups()
+        (
+            to,
+            dst,
+            mask,
+            gateway,
+            dev,
+            flags,
+            recvpipe,
+            sendpipe,
+            ssthresh,
+            rtt,
+            rttvar,
+            hopcount,
+            mtu,
+            expire,
+        ) = route.groups()
         # recvpipe = int(recvpipe)
         # sendpipe = int(sendpipe)
         # ssthresh = int(ssthresh)
@@ -319,7 +345,7 @@ class _RouteGet:
             self._route["gateway"] = Prefix(gateway)
         self._route["dev"] = dev
         try:
-            self._route["prefsrc"] = get_prefsrc(self._route["dst"])
+            self._route["prefsrc"] = socket.get_prefsrc(self._route["dst"])
         except Exception:
             pass
         self._route["flags"] = flags.split(",") if flags != "" else []
@@ -379,7 +405,9 @@ class RouteGet:
     __slots__ = "_route"
 
     def __init__(self, host, uid=None):
-        res = shell(_ROUTE, "-n", "get", "-inet" if host.version == 4 else "-inet6", repr(host))
+        res = utils.shell(
+            _ROUTE, "-n", "get", "-inet" if host.version == 4 else "-inet6", repr(host)
+        )
         self._route = _RouteGet(res, uid=uid)
 
     def dict(self, details=True):

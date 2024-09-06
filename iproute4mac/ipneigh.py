@@ -1,10 +1,15 @@
+import iproute4mac.libc as libc
 import iproute4mac.nud as nud
+import iproute4mac.prefix as prefix
+import iproute4mac.socket as socket
+import iproute4mac.utils as utils
 
-from iproute4mac.utils import *
+from iproute4mac import OPTION
+from iproute4mac.utils import matches, strcmp, next_arg, get_addr, get_prefix
 
 
 def usage():
-    stderr("""\
+    utils.stderr("""\
 Usage: ip neigh { add | del | change | replace }
                 { ADDR [ lladdr LLADDR ] [ nud STATE ] proxy ADDR }
                 [ dev DEV ] [ router ] [ extern_learn ] [ protocol PROTO ]
@@ -16,7 +21,7 @@ Usage: ip neigh { add | del | change | replace }
 
 STATE := { delay | failed | incomplete | noarp | none |
            permanent | probe | reachable | stale }""")
-    exit(EXIT_ERROR)
+    exit(libc.EXIT_ERROR)
 
 
 def ipneigh_modify(cmd, argv):
@@ -30,9 +35,9 @@ def ipneigh_modify(cmd, argv):
         if matches(opt, "lladdr"):
             opt = next_arg(argv)
             if lla:
-                duparg("lladdr", opt)
+                utils.duparg("lladdr", opt)
             lla = opt
-            entries.set([e for e in entries if e["lladdr"] == lla])
+            entries.set([e for e in entries if e.get("lladdr") == lla])
         elif strcmp(opt, "nud"):
             state = next_arg(argv)
             if strcmp(state, "all"):
@@ -41,63 +46,63 @@ def ipneigh_modify(cmd, argv):
             try:
                 state = nud.from_string(state)
             except ValueError:
-                invarg("nud state is bad", state)
+                utils.invarg("nud state is bad", state)
             states.append(nud.to_state(state))
         elif matches(opt, "proxy"):
             opt = next_arg(argv)
             if matches(opt, "help"):
                 usage()
             if dst:
-                duparg("address", opt)
+                utils.duparg("address", opt)
             dst = get_addr(opt, OPTION["preferred_family"])
         elif strcmp(opt, "router"):
             entries.set([e for e in entries if "router" in e])
         elif matches(opt, "extern_learn"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "dev"):
             opt = next_arg(argv)
             if dev:
-                duparg("dev", opt)
+                utils.duparg("dev", opt)
             dev = opt
             entries.set([e for e in entries if e["dev"] == dev])
         elif matches(opt, "protocol"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         else:
             if strcmp(opt, "to"):
                 opt = next_arg(argv)
             if matches(opt, "help"):
                 usage()
             if dst:
-                duparg2("to", opt)
+                utils.duparg2("to", opt)
             try:
                 dst = get_addr(opt, OPTION["preferred_family"])
             except ValueError:
-                invarg("to value is invalid", opt)
+                utils.invarg("to value is invalid", opt)
             entries.set([e for e in entries if e["dst"] in dst])
 
     if not dev or not dst:
-        stderr("Device and destination are required arguments.")
-        exit(EXIT_ERROR)
+        utils.stderr("Device and destination are required arguments.")
+        exit(libc.EXIT_ERROR)
 
-    if OPTION["preferred_family"] != AF_UNSPEC:
+    if OPTION["preferred_family"] != socket._AF_UNSPEC:
         entries.set([e for e in entries if e["dst"].family == OPTION["preferred_family"]])
 
     if states:
         entries.set([e for e in entries if set(e["state"]) <= set(states)])
 
     if matches(cmd, "add"):
-        do_notimplemented()
+        utils.do_notimplemented()
     elif matches(cmd, "change"):
-        do_notimplemented()
+        utils.do_notimplemented()
     elif matches(cmd, "replace"):
-        do_notimplemented()
+        utils.do_notimplemented()
     elif matches(cmd, "delete"):
         for entry in entries:
             nud.delete(entry["dst"], dev=entry["dev"])
     else:
-        do_notimplemented()
+        utils.do_notimplemented()
 
-    return EXIT_SUCCESS
+    return libc.EXIT_SUCCESS
 
 
 def ipneigh_get(argv):
@@ -109,7 +114,7 @@ def ipneigh_get(argv):
         if strcmp(opt, "dev"):
             opt = next_arg(argv)
             if dev:
-                duparg("dev", opt)
+                utils.duparg("dev", opt)
             dev = opt
             entries.set([e for e in entries if e["dev"] == dev])
         elif strcmp(opt, "proxy"):
@@ -120,27 +125,27 @@ def ipneigh_get(argv):
             if matches(opt, "help"):
                 usage()
             if dst:
-                duparg2("to", opt)
+                utils.duparg2("to", opt)
             try:
                 dst = get_addr(opt, OPTION["preferred_family"])
             except ValueError:
-                invarg("to value is invalid", opt)
+                utils.invarg("to value is invalid", opt)
             entries.set([e for e in entries if e["dst"] == dst])
 
     if not dev or not dst:
-        stderr("Device and address are required arguments.")
-        return EXIT_FAILURE
+        utils.stderr("Device and address are required arguments.")
+        return libc.EXIT_FAILURE
 
     OPTION["json"] = False
-    output(entries)
+    utils.output(entries)
 
-    return EXIT_SUCCESS
+    return libc.EXIT_SUCCESS
 
 
 def ipneigh_list_or_flush(argv, flush=False):
     if flush and not argv:
-        stderr("Flush requires arguments.")
-        exit(EXIT_ERROR)
+        utils.stderr("Flush requires arguments.")
+        exit(libc.EXIT_ERROR)
 
     entries = nud.Nud()
     dev = None
@@ -150,16 +155,16 @@ def ipneigh_list_or_flush(argv, flush=False):
         if strcmp(opt, "dev"):
             opt = next_arg(argv)
             if dev:
-                duparg("dev", opt)
+                utils.duparg("dev", opt)
             dev = opt
             entries.set([e for e in entries if e["dev"] == dev])
             if not flush:
-                delete_keys(entries, "dev")
+                utils.delete_keys(entries, "dev")
         elif strcmp(opt, "master"):
             opt = next_arg(argv)
-            warn("Kernel does not support filtering by master device")
+            utils.warn("Kernel does not support filtering by master device")
         elif strcmp(opt, "vrf"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "unused"):
             entries.set([e for e in entries if e.unused])
         elif strcmp(opt, "nud"):
@@ -170,24 +175,24 @@ def ipneigh_list_or_flush(argv, flush=False):
             try:
                 state = nud.from_string(state)
             except ValueError:
-                invarg("nud state is bad", state)
+                utils.invarg("nud state is bad", state)
             states.append(nud.to_state(state))
         elif strcmp(opt, "proxy"):
             entries.set([e for e in entries if "proxy" in e["state"]])
         elif matches(opt, "protocol"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         else:
             if strcmp(opt, "to"):
                 opt = next_arg(argv)
             if matches(opt, "help"):
                 usage()
             try:
-                prefix = get_addr(opt, OPTION["preferred_family"])
+                to = get_addr(opt, OPTION["preferred_family"])
             except ValueError:
-                invarg("to value is invalid", opt)
-            entries.set([e for e in entries if e["dst"] in prefix])
+                utils.invarg("to value is invalid", opt)
+            entries.set([e for e in entries if e["dst"] in to])
 
-    if OPTION["preferred_family"] != AF_UNSPEC:
+    if OPTION["preferred_family"] != socket._AF_UNSPEC:
         entries.set([e for e in entries if e["dst"].family == OPTION["preferred_family"]])
 
     if states:
@@ -197,9 +202,9 @@ def ipneigh_list_or_flush(argv, flush=False):
         for entry in entries:
             nud.delete(entry["dst"], dev=entry["dev"])
     else:
-        output(entries)
+        utils.output(entries)
 
-    return EXIT_SUCCESS
+    return libc.EXIT_SUCCESS
 
 
 def do_ipneigh(argv):
@@ -218,5 +223,5 @@ def do_ipneigh(argv):
     elif matches(cmd, "help"):
         usage()
 
-    stderr(f'Command "{cmd}" is unknown, try "ip neigh help".')
-    exit(EXIT_ERROR)
+    utils.stderr(f'Command "{cmd}" is unknown, try "ip neigh help".')
+    exit(libc.EXIT_ERROR)

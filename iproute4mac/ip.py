@@ -1,10 +1,22 @@
 #!/usr/bin/env python3
 
-from iproute4mac.utils import *
-from iproute4mac.iplink import do_iplink
-from iproute4mac.ipaddress import do_ipaddr
-from iproute4mac.iproute import do_iproute
-from iproute4mac.ipneigh import do_ipneigh
+import iproute4mac
+import os
+import sys
+
+import iproute4mac.ipaddress as ipaddress
+import iproute4mac.iplink as iplink
+import iproute4mac.ipneigh as ipneigh
+import iproute4mac.iproute as iproute
+import iproute4mac.libc as libc
+import iproute4mac.socket as socket
+import iproute4mac.utils as utils
+
+from iproute4mac import OPTION
+from iproute4mac.utils import matches, strcmp, matches_color
+
+
+OPTION["uid"] = os.getuid()
 
 
 def do_help(argv=[]):
@@ -12,7 +24,7 @@ def do_help(argv=[]):
 
 
 def usage():
-    stderr("""\
+    utils.stderr("""\
 Usage: ip [ OPTIONS ] OBJECT { COMMAND | help }
        ip [ -force ] -batch filename
 where  OBJECT := { address | addrlabel | fou | help | ila | ioam | l2tp | link |
@@ -28,45 +40,45 @@ where  OBJECT := { address | addrlabel | fou | help | ila | ioam | l2tp | link |
                     -o[neline] | -t[imestamp] | -ts[hort] | -b[atch] [filename] |
                     -rc[vbuf] [size] | -n[etns] name | -N[umeric] | -a[ll] |
                     -c[olor]}""")
-    exit(EXIT_ERROR)
+    exit(libc.EXIT_ERROR)
 
 
 # Implemented objects
 OBJS = [
-    ("address", do_ipaddr),
-    ("addrlabel", do_notimplemented),
-    ("maddress", do_notimplemented),
-    ("route", do_iproute),
-    ("rule", do_notimplemented),
-    ("neighbor", do_ipneigh),
-    ("neighbour", do_ipneigh),
-    ("ntable", do_notimplemented),
-    ("ntbl", do_notimplemented),
-    ("link", do_iplink),
-    ("l2tp", do_notimplemented),
-    ("fou", do_notimplemented),
-    ("ila", do_notimplemented),
-    ("macsec", do_notimplemented),
-    ("tunnel", do_notimplemented),
-    ("tunl", do_notimplemented),
-    ("tuntap", do_notimplemented),
-    ("tap", do_notimplemented),
-    ("token", do_notimplemented),
-    ("tcpmetrics", do_notimplemented),
-    ("tcp_metrics", do_notimplemented),
-    ("monitor", do_notimplemented),
-    ("xfrm", do_notimplemented),
-    ("mroute", do_notimplemented),
-    ("mrule", do_notimplemented),
-    ("netns", do_notimplemented),
-    ("netconf", do_notimplemented),
-    ("vrf", do_notimplemented),
-    ("sr", do_notimplemented),
-    ("nexthop", do_notimplemented),
-    ("mptcp", do_notimplemented),
-    ("ioam", do_notimplemented),
+    ("address", ipaddress.do_ipaddr),
+    ("addrlabel", utils.do_notimplemented),
+    ("maddress", utils.do_notimplemented),
+    ("route", iproute.do_iproute),
+    ("rule", utils.do_notimplemented),
+    ("neighbor", ipneigh.do_ipneigh),
+    ("neighbour", ipneigh.do_ipneigh),
+    ("ntable", utils.do_notimplemented),
+    ("ntbl", utils.do_notimplemented),
+    ("link", iplink.do_iplink),
+    ("l2tp", utils.do_notimplemented),
+    ("fou", utils.do_notimplemented),
+    ("ila", utils.do_notimplemented),
+    ("macsec", utils.do_notimplemented),
+    ("tunnel", utils.do_notimplemented),
+    ("tunl", utils.do_notimplemented),
+    ("tuntap", utils.do_notimplemented),
+    ("tap", utils.do_notimplemented),
+    ("token", utils.do_notimplemented),
+    ("tcpmetrics", utils.do_notimplemented),
+    ("tcp_metrics", utils.do_notimplemented),
+    ("monitor", utils.do_notimplemented),
+    ("xfrm", utils.do_notimplemented),
+    ("mroute", utils.do_notimplemented),
+    ("mrule", utils.do_notimplemented),
+    ("netns", utils.do_notimplemented),
+    ("netconf", utils.do_notimplemented),
+    ("vrf", utils.do_notimplemented),
+    ("sr", utils.do_notimplemented),
+    ("nexthop", utils.do_notimplemented),
+    ("mptcp", utils.do_notimplemented),
+    ("ioam", utils.do_notimplemented),
     ("help", do_help),
-    ("stats", do_notimplemented),
+    ("stats", utils.do_notimplemented),
 ]
 
 
@@ -76,14 +88,14 @@ def do_obj(argv):
         if o.startswith(obj):
             return f(argv)
 
-    stderr(f'Object "{obj}" is unknown, try "ip help".')
-    return EXIT_FAILURE
+    utils.stderr(f'Object "{obj}" is unknown, try "ip help".')
+    return libc.EXIT_FAILURE
 
 
 def main():
     if sys.platform != "darwin":
-        stderr("Unupported OS.")
-        exit(EXIT_ERROR)
+        utils.stderr("Unupported OS.")
+        exit(libc.EXIT_ERROR)
 
     batch_file = None
     argv = sys.argv[1:]
@@ -102,29 +114,29 @@ def main():
             try:
                 OPTION["max_flush_loops"] = int(argv.pop(0))
             except IndexError:
-                missarg("loop count")
+                utils.missarg("loop count")
             except ValueError:
-                error("loop count not a number")
+                utils.error("loop count not a number")
         elif matches(opt, "-family"):
             try:
                 opt = argv.pop(0)
             except IndexError:
-                missarg("family type")
+                utils.missarg("family type")
             if strcmp(opt, "help"):
                 usage()
-            OPTION["preferred_family"] = read_family(opt)
-            if OPTION["preferred_family"] == AF_UNSPEC:
-                invarg("invalid protocol family", opt)
+            OPTION["preferred_family"] = socket.read_family(opt)
+            if OPTION["preferred_family"] == socket._AF_UNSPEC:
+                utils.invarg("invalid protocol family", opt)
         elif strcmp(opt, "-4"):
-            OPTION["preferred_family"] = AF_INET
+            OPTION["preferred_family"] = socket._AF_INET
         elif strcmp(opt, "-6"):
-            OPTION["preferred_family"] = AF_INET6
+            OPTION["preferred_family"] = socket._AF_INET6
         elif strcmp(opt, "-0"):
-            OPTION["preferred_family"] = AF_PACKET
+            OPTION["preferred_family"] = socket._AF_PACKET
         elif strcmp(opt, "-M"):
-            OPTION["preferred_family"] = AF_MPLS
+            OPTION["preferred_family"] = socket._AF_MPLS
         elif strcmp(opt, "-B"):
-            OPTION["preferred_family"] = AF_BRIDGE
+            OPTION["preferred_family"] = socket._AF_BRIDGE
         elif matches(opt, "-human-readable"):
             OPTION["human_readable"] = True
         elif matches(opt, "-iec"):
@@ -143,15 +155,15 @@ def main():
             OPTION["timestamp"] = True
             OPTION["timestamp_short"] = True
         elif matches(opt, "-Version"):
-            print(f"ip wrapper, iproute4mac-{VERSION}")
-            exit(EXIT_SUCCESS)
+            print(f"ip wrapper, iproute4mac-{iproute4mac.VERSION}")
+            exit(libc.EXIT_SUCCESS)
         elif matches(opt, "-force"):
             OPTION["force"] = True
         elif matches(opt, "-batch"):
             try:
                 batch_file = argv.pop(0)
             except IndexError:
-                missarg("batch file")
+                utils.missarg("batch file")
         elif matches(opt, "-brief"):
             OPTION["brief"] = True
         elif matches(opt, "-json"):
@@ -162,16 +174,16 @@ def main():
             try:
                 OPTION["rcvbuf"] = int(argv.pop(0))
             except IndexError:
-                missarg("rcvbuf size")
+                utils.missarg("rcvbuf size")
             except ValueError:
-                error("rcvbuf size not a number")
+                utils.error("rcvbuf size not a number")
         elif matches_color(opt):
             # silently ignore not implemented color option
             pass
         elif matches(opt, "-help"):
             usage()
         elif matches(opt, "-netns"):
-            do_notimplemented()
+            utils.do_notimplemented()
         elif matches(opt, "-Numeric"):
             OPTION["numeric"] = True
         elif matches(opt, "-all"):
@@ -179,21 +191,23 @@ def main():
         elif strcmp(opt, "-echo"):
             OPTION["echo_request"] = True
         elif matches(opt, "-verbose", "-vvv"):
-            while opt[1] == "v" and OPTION["verbose"] < LOG_DEBUG:
+            while opt[1] == "v" and OPTION["verbose"] < utils.LOG_DEBUG:
                 OPTION["verbose"] += 1
                 if len(opt) <= 2:
                     break
                 opt = opt[1:]
         elif matches(opt, "-silent"):
-            OPTION["verbose"] = LOG_STDERR
+            OPTION["verbose"] = utils.LOG_STDERR
         elif matches(opt, "-quiet"):
             OPTION["verbose"] = -1
+        elif matches(opt, "-debug"):
+            pass
         else:
-            stderr(f'Option "{opt}" is unknown, try "ip -help".')
-            exit(EXIT_ERROR)
+            utils.stderr(f'Option "{opt}" is unknown, try "ip -help".')
+            exit(libc.EXIT_ERROR)
 
     if batch_file:
-        do_notimplemented()
+        utils.do_notimplemented()
 
     if argv:
         return do_obj(argv)

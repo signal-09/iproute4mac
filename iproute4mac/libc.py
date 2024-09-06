@@ -4,6 +4,10 @@ import ctypes.util
 
 _LIBC = ctypes.CDLL(ctypes.util.find_library("c"))
 
+EXIT_FAILURE = 1
+EXIT_SUCCESS = 0
+EXIT_ERROR = 255
+
 
 def sysctl(name):
     size = ctypes.c_uint(0)

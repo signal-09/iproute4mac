@@ -1,20 +1,20 @@
 import ipaddress
 
-from iproute4mac import *
+import iproute4mac.socket as socket
 
 
 def version_to_family(version):
     if version == 4:
-        return AF_INET
+        return socket._AF_INET
     if version == 6:
-        return AF_INET6
+        return socket._AF_INET6
     raise ValueError("unknown IP version")
 
 
 def family_to_version(family):
-    if family == AF_INET:
+    if family == socket._AF_INET:
         return 4
-    if family == AF_INET6:
+    if family == socket._AF_INET6:
         return 6
     raise ValueError("unknown address family")
 
@@ -24,7 +24,7 @@ class Prefix:
 
     def __init__(self, prefix, family=None, version=None, pack=False):
         if family is not None and version is not None:
-            raise VelueError("'family' and 'version' are mutually exclusive")
+            raise ValueError("'family' and 'version' are mutually exclusive")
         elif family:
             version = family_to_version(family)
         elif version and version not in (4, 6):
@@ -98,7 +98,7 @@ class Prefix:
         return str(self) == str(other)
 
     def __contains__(self, other):
-        if not isinstance(other, Prefix | str):
+        if not isinstance(other, str | Prefix):
             return False
         elif isinstance(other, str):
             other = Prefix(other)
@@ -189,7 +189,9 @@ class Prefix:
 
     @property
     def is_any(self):
-        return self._is_any or (self._initialized and self.address._ip + self.prefixlen - self.max_prefixlen == 0)
+        return self._is_any or (
+            self._initialized and self.address._ip + self.prefixlen - self.max_prefixlen == 0
+        )
 
     @property
     def is_default(self):
@@ -205,7 +207,11 @@ class Prefix:
 
     @property
     def is_host(self):
-        return self._is_localhost or self._is_any or (self._initialized and self.prefixlen == self.max_prefixlen)
+        return (
+            self._is_localhost
+            or self._is_any
+            or (self._initialized and self.prefixlen == self.max_prefixlen)
+        )
 
     @property
     def is_link(self):
@@ -268,7 +274,9 @@ class Prefix:
         if value not in (4, 6):
             raise ValueError(f'"{value}" does not appear to be a valid IP version protocol')
         if self._initialized:
-            raise ValueError("IP version protocol cannot be assigned to an already initialized prefix")
+            raise ValueError(
+                "IP version protocol cannot be assigned to an already initialized prefix"
+            )
         if self._is_localhost:
             if value == 4:
                 self._address = ipaddress.ip_address("127.0.0.1")

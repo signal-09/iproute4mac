@@ -1,10 +1,12 @@
 import iproute4mac.ifconfig as ifconfig
+import iproute4mac.libc as libc
+import iproute4mac.utils as utils
 
-from iproute4mac.utils import *
+from iproute4mac.utils import matches, strcmp, next_arg
 
 
 def explain():
-    stderr("""\
+    utils.stderr("""\
 Usage: ... bond [ mode BONDMODE ] [ active_slave SLAVE_DEV ]
                 [ clear_active_slave ] [ miimon MIIMON ]
                 [ updelay UPDELAY ] [ downdelay DOWNDELAY ]
@@ -41,7 +43,7 @@ XMIT_HASH_POLICY := layer2|layer2+3|layer3+4|encap2+3|encap3+4|vlan+srcmac
 LACP_ACTIVE := off|on
 LACP_RATE := slow|fast
 AD_SELECT := stable|bandwidth|count""")
-    exit(EXIT_ERROR)
+    exit(libc.EXIT_ERROR)
 
 
 BOND_MODE = [
@@ -64,76 +66,76 @@ def parse(argv, args):
                 if strcmp(bond, linux_bond, bsd_bond):
                     break
             else:
-                invarg("invalid mode", bond)
+                utils.invarg("invalid mode", bond)
             if not bsd_bond:
-                invarg("bond mode not supported", bond)
+                utils.invarg("bond mode not supported", bond)
             args["mode"] = bsd_bond
         elif matches(opt, "active_slave"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "clear_active_slave"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "miimon"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "updelay"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "downdelay"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "peer_notify_delay"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "use_carrier"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "arp_interval"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "arp_ip_target"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "arp_validate"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "arp_all_targets"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "primary"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "primary_reselect"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "fail_over_mac"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "xmit_hash_policy"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "resend_igmp"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "num_grat_arp", "num_unsol_na"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "all_slaves_active"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "min_links"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "lp_interval"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "packets_per_slave"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "lacp_rate"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif strcmp(opt, "lacp_active"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "ad_select"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "ad_user_port_key"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "ad_actor_sys_prio"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "ad_actor_system"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "tlb_dynamic_lb"):
-            do_notimplemented(opt)
+            utils.do_notimplemented(opt)
         elif matches(opt, "help"):
             explain()
         else:
-            stderr(f'bond: unknown command "{opt}"?')
+            utils.stderr(f'bond: unknown command "{opt}"?')
             explain()
 
 
 def add(dev, args):
     if res := ifconfig.run(dev, "create"):
-        stdout(res, optional=True)
+        utils.stdout(res, optional=True)
 
 
 def set(dev, args):
@@ -142,7 +144,7 @@ def set(dev, args):
         if strcmp(opt, "mode"):
             res += ifconfig.run(dev, "bondmode", value)
     if res:
-        stdout(res, optional=True)
+        utils.stdout(res, optional=True)
 
 
 def delete(link, args):
@@ -151,23 +153,10 @@ def delete(link, args):
 
 def link(link, master):
     ifconfig.run(master["ifname"], "bonddev", link["ifname"])
-    link["master"] = master["ifname"]
-    link["linkinfo"] = link.get("linkinfo", {})
-    link["linkinfo"].update(
-        {
-            "info_slave_kind": "bond",
-            "perm_hwaddr": link["address"],
-        }
-    )
 
 
 def free(link, master):
     ifconfig.run(master["ifname"], "-bonddev", link["ifname"])
-    del link["linkinfo"]["info_slave_kind"]
-    del link["linkinfo"]["perm_hwaddr"]
-    if not link["linkinfo"]:
-        del link["linkinfo"]
-    del link["master"]
 
 
 def dump(argv, links):

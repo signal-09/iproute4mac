@@ -1,4 +1,12 @@
-from iproute4mac.utils import *
+import re
+
+import iproute4mac.socket as socket
+import iproute4mac.utils as utils
+
+from iproute4mac import OPTION
+from iproute4mac.ifconfig import IPV4ADDR, IPV6ADDR, LLADDR, IFNAME
+from iproute4mac.prefix import Prefix
+from iproute4mac.utils import matches, strcmp
 
 
 _ARP = "arp"
@@ -82,20 +90,20 @@ def from_desc(value):
 
 def run(*argv, cmd=None):
     res = ""
-    if not cmd and OPTION["preferred_family"] != AF_INET6:
-        res += shell(_ARP, *argv)
-    if not cmd and OPTION["preferred_family"] != AF_INET:
-        res += shell(_NDP, *argv)
+    if not cmd and OPTION["preferred_family"] != socket._AF_INET6:
+        res += utils.shell(_ARP, *argv)
+    if not cmd and OPTION["preferred_family"] != socket._AF_INET:
+        res += utils.shell(_NDP, *argv)
     if cmd:
-        res += shell(cmd, *argv)
+        res += utils.shell(cmd, *argv)
     return res
 
 
 def delete(host, dev=None):
-    if host.family == AF_INET:
-        shell(_ARP, "-d", host, "ifscope" if dev else None, dev)
+    if host.family == socket._AF_INET:
+        utils.shell(_ARP, "-d", host, "ifscope" if dev else None, dev)
     else:
-        shell(_NDP, "-d", f"{host}%{dev}" if dev else host)
+        utils.shell(_NDP, "-d", f"{host}%{dev}" if dev else host)
 
 
 class _Nud:
@@ -124,9 +132,15 @@ class _Nud:
                 state = _NUD_REACHABLE
         self._nud["state"] = [to_state(state)]
 
-    @property
-    def unused(self):
-        return to_state(_NUD_REACHABLE) not in self._nud["state"]
+    def __contains__(self, other):
+        return other in self._nud
+
+    def __str__(self):
+        return self.str()
+
+    def __iter__(self):
+        for k, v in self._nud:
+            yield k, v
 
     def __getitem__(self, key):
         return self._nud.get(key)
@@ -135,11 +149,15 @@ class _Nud:
         self._nud[key] = value
 
     def __delitem__(self, key):
-        if self._present(self._nud, key):
+        if key in self._nud:
             del self._nud[key]
 
-    def __contains__(self, other):
-        return other in self._nud
+    def _format(self, string, *fields, default=None):
+        return utils.dict_format(self._nud, string, *fields, default=default)
+
+    @property
+    def unused(self):
+        return to_state(_NUD_REACHABLE) not in self._nud["state"]
 
     def get(self, key, value=None):
         return self._nud.get(key, value)
@@ -154,16 +172,12 @@ class _Nud:
 
     def str(self, details=True):
         res = str(self._nud["dst"])
-        if "dev" in self._nud:
-            res += " dev " + self._nud["dev"]
-        if "lladdr" in self._nud:
-            res += " lladdr " + self._nud["lladdr"]
+        res += self._format(" dev {}", "dev")
+        res += self._format(" lladdr {}", "lladdr")
         for key in ["router", "proxy"]:
-            if key in self._nud:
-                res += " " + key
-        for state in self._nud["state"]:
-            res += " " + state
-        return res + "\n"
+            res += self._format(f" {key}", key)
+        res += f" {self._nud['state'][0]}"
+        return res
 
 
 class Nud:
@@ -193,14 +207,21 @@ class Nud:
 
     def __init__(self):
         self._nuds = []
-        res = shell(_ARP, "-n", "-l", "-a")
+        res = utils.shell(_ARP, "-n", "-l", "-a")
         for nud in self._arp.finditer(res):
             dst, lladdr, exp_o, exp_i, dev, refs, probes = nud.groups()
             self._nuds.append(_Nud(dst, lladdr, dev, exp_o, exp_i))
-        res = shell(_NDP, "-n", "-l", "-a")
+        res = utils.shell(_NDP, "-n", "-l", "-a")
         for nud in self._ndp.finditer(res):
             dst, lladdr, dev, exp_o, exp_i, state, flag, probes = nud.groups()
             self._nuds.append(_Nud(dst, lladdr, dev, exp_o, exp_i, state, flag))
+
+    def __iter__(self):
+        for nud in self._nuds:
+            yield nud
+
+    def __str__(self):
+        return "\n".join(map(str, self._nuds))
 
     def __len__(self):
         return len(self._nuds)
@@ -216,14 +237,11 @@ class Nud:
             raise ValueError("argument is not list() of <class 'nud._Nud'>")
         self._nuds = nuds
 
-    def dict(self, details=True):
+    def dict(self, details=None):
         """
         List nud dictiornaries
         """
         return [n.dict(details=details) for n in self._nuds]
 
-    def str(self, details=True):
-        res = ""
-        for n in self._nuds:
-            res += n.str(details=details)
-        return res
+    def str(self, details=None):
+        return "\n".join([nud.str(details=details) for nud in self._nuds])

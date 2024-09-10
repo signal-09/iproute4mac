@@ -23,8 +23,8 @@ def debug_address(argv=[]):
     ip_ifconfig = str(interfaces)
     os_ifconfig = ifconfig.run()
 
-    diff = unified_diff(ip_ifconfig.splitlines(), os_ifconfig.splitlines(), n=1000)
-    print("\n".join(list(diff)))
+    if diff := list(unified_diff(ip_ifconfig.splitlines(), os_ifconfig.splitlines(), n=10000)):
+        print("\n".join(list(diff)))
 
 
 def debug_neigh(argv=[]):

@@ -327,6 +327,7 @@ class _Ifconfig(_IfconfigBase):
             "capabilities": _reDict(self._capabilities, text).data,
             "hwassist": _reDict(self._hwassist, text).data,
             **_reDict(self._ether, text).data,
+            "broadcast": None,
             "bridge": _reBridge(self._bridge, text).data,
             **_reDict(self._peer, text).data,
             "address": _reList(self._address, text).data,
@@ -340,6 +341,7 @@ class _Ifconfig(_IfconfigBase):
             "bond": _reBond(self._bond, text).data,
             **_reDict(self._generation_id, text).data,
             **_reDict(self._type, text).data,
+            "link_type": None,
             "agent": _reList(self._agent, text).data,
             "link_quality": _reDict(self._link_quality, text).data,
             "state_availability": _reDict(self._state_availability, text).data,
@@ -356,14 +358,13 @@ class _Ifconfig(_IfconfigBase):
             **_reDict(self._routermode6, text).data,
         }
 
-        if "LOOPBACK" in self._data["flags"]:
-            self._data["link_type"] = "loopback"
-            self._data["lladdress"] = "00:00:00:00:00:00"
-            self._data["llbroadcast"] = "00:00:00:00:00:00"
         if self._data.get("ether"):
             self._data["link_type"] = "ether"
-            self._data["lladdress"] = self._data["ether"]
-            self._data["llbroadcast"] = "ff:ff:ff:ff:ff:ff"
+            self._data["broadcast"] = "ff:ff:ff:ff:ff:ff"
+        elif "LOOPBACK" in self._data["flags"]:
+            self._data["link_type"] = "loopback"
+            self._data["ether"] = "00:00:00:00:00:00"
+            self._data["broadcast"] = "00:00:00:00:00:00"
 
     def __iter__(self):
         for key, value in self._data:
@@ -424,7 +425,8 @@ class _Ifconfig(_IfconfigBase):
         for flags in ["eflags", "xflags", "options", "capabilities", "hwassist"]:
             if data.get(flags):
                 res += f"\t{flags}={data[flags]['flag']}<{data[flags]['flags']}>\n"
-        res += utils.dict_format(data, "\tether {}\n", "ether")
+        if self._data["link_type"] != "loopback":
+            res += utils.dict_format(data, "\tether {}\n", "ether")
         if data.get("bridge"):
             bridge = data["bridge"]
             res += "\tConfiguration:\n"
@@ -551,9 +553,9 @@ class _IpAddress(_IfconfigBase):
             "group": "default",
             "txqlen": _TXQLEN,
             "link_type": self._ifconfig.get("link_type", "none"),
-            "address": self._ifconfig.get("lladdress"),
+            "address": self._ifconfig.get("ether"),
             "link_pointtopoint": True if "POINTOPOINT" in self._ifconfig["flags"] else None,
-            "broadcast": self._ifconfig.get("llbroadcast"),
+            "broadcast": self._ifconfig.get("broadcast"),
             # TODO:
             # "promiscuity": 0,
             # "min_mtu": 0,
@@ -661,7 +663,7 @@ class _IpAddress(_IfconfigBase):
         if self._ifconfig.link:
             if self._ifconfig.link.name.startswith("bond"):
                 # FIXME: where to find original hardawre lladdr?
-                return {"perm_hwaddr": self._ifconfig["lladdress"]}
+                return {"perm_hwaddr": self._ifconfig["ether"]}
         return None
 
     def _get_linkinfo(self):
@@ -796,7 +798,7 @@ class Ifconfig:
     def __init__(self):
         self._interfaces = []
         res = utils.shell(_IFCONFIG, *_IFCONFIG_OPTS, "-a")
-        for text in re.findall(rf"(^{IFNAME}:.*\n(?:\t.*[\n|$])*)", res, flags=re.MULTILINE):
+        for text in re.findall(r"(^\w+:.*$\n(?:^\t.*$\n*)*)", res, flags=re.MULTILINE):
             # for every single interface:
             self._interfaces.append(self._kind(text=text))
 

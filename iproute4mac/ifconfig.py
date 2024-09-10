@@ -566,7 +566,7 @@ class _IpAddress(_IfconfigBase):
             # "num_rx_queues": 1,
             # "gso_max_size": 65536,
             # "gso_max_segs": 65535,
-            "addr_info": None,  # async __update__ with self._get_addr_info()
+            "addr_info": self._get_addr_info(),
         }
 
     def __update__(self):
@@ -575,7 +575,6 @@ class _IpAddress(_IfconfigBase):
                 "link": self._get_link(),
                 "master": self._get_master(),
                 "linkinfo": self._get_linkinfo(),
-                "addr_info": self._get_addr_info(),
             }
         )
 
@@ -587,8 +586,8 @@ class _IpAddress(_IfconfigBase):
         return None
 
     def _get_master(self):
-        if self._ifconfig.link:
-            return self._ifconfig.link.name
+        if self.link:
+            return self.link.name
         return None
 
     def _get_info_kind(self):
@@ -649,14 +648,13 @@ class _IpAddress(_IfconfigBase):
                     # "nf_call_iptables": 0,
                     # "nf_call_ip6tables": 0,
                     # "nf_call_arptables": 0,
-                    "ipfilter": self._ifconfig["bridge"]["ipfilter"] != "disabled",
                 }
             )
         return info_data if info_data else None
 
     def _get_info_slave_kind(self):
-        if self._ifconfig.link:
-            return self._ifconfig.link._get_info_kind()
+        if self.link:
+            return self.link._get_info_kind()
         return None
 
     def _get_info_slave_data(self):
@@ -864,13 +862,10 @@ class IpAddress(Ifconfig):
                 if member is None:
                     continue
                 if isinstance(member, str):
-                    member = self.lookup("ifname", member)
-                    interface._ifconfig["bond"][index] = member
-                member.link = interface
+                    self.lookup("ifname", member).link = interface
             if interface._ifconfig.get("bridge"):
                 for member in interface._ifconfig["bridge"].get("member", []):
                     if isinstance(member["interface"], str):
-                        member["interface"] = self.lookup("ifname", member["interface"])
-                    member["interface"].link = interface
+                        self.lookup("ifname", member["interface"]).link = interface
         for interface in self._interfaces:
             interface.__update__()

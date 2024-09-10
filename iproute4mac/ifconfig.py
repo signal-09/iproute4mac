@@ -19,22 +19,6 @@ _ND6_INFINITE_LIFETIME = 0xFFFFFFFF
 # map operstates
 OPER_STATES = {"active": "UP", "inactive": "DOWN", "none": "UNKNOWN"}
 
-_OPTIONAL_FIELDS = [
-    "eflags",
-    "xflags",
-    "options",
-    "capabilities",
-    "hwassist",
-    "promiscuity",
-    "min_mtu",
-    "max_mtu",
-    "linkinfo",
-    "num_tx_queues",
-    "num_rx_queues",
-    "gso_max_size",
-    "gso_max_segs",
-]
-
 # MAC address RegEx
 LLSEG = "[0-9a-fA-F]{1,2}"
 LLADDR = "(?:%s(?::%s){5})" % (LLSEG, LLSEG)
@@ -187,6 +171,21 @@ class _IfconfigBase:
     _name = None
     _data = None
     _link = None
+    _OPTIONAL_FIELDS = [
+        "eflags",
+        "xflags",
+        "options",
+        "capabilities",
+        "hwassist",
+        "promiscuity",
+        "min_mtu",
+        "max_mtu",
+        "linkinfo",
+        "num_tx_queues",
+        "num_rx_queues",
+        "gso_max_size",
+        "gso_max_segs",
+    ]
 
     def __init__(self):
         raise NotImplementedError
@@ -233,7 +232,7 @@ class _IfconfigBase:
         for key, value in self._data.items():
             if value is None:
                 continue
-            if key not in _OPTIONAL_FIELDS or details:
+            if key not in self._OPTIONAL_FIELDS or details:
                 res[key] = value
         return res
 
@@ -315,6 +314,14 @@ class _Ifconfig(_IfconfigBase):
     _routermode4 = re.compile(r"\troutermode4: (?P<routermode4>\w+)")
     _routermode6 = re.compile(r"\troutermode6: (?P<routermode6>\w+)")
 
+    @property
+    def link(self):
+        if self._data.get("peer"):
+            return self._data["peer"]
+        if self._data.get("vlan", {}).get("parent"):
+            return self._data["vlan"]["parent"]
+        return None
+
     def __init__(self, text):
         (self._name, text) = _reDict(self._name_data, text).groups()
 
@@ -341,7 +348,7 @@ class _Ifconfig(_IfconfigBase):
             "bond": _reBond(self._bond, text).data,
             **_reDict(self._generation_id, text).data,
             **_reDict(self._type, text).data,
-            "link_type": "none",
+            "link_type": "unknown",
             "agent": _reList(self._agent, text).data,
             "link_quality": _reDict(self._link_quality, text).data,
             "state_availability": _reDict(self._state_availability, text).data,
@@ -365,6 +372,8 @@ class _Ifconfig(_IfconfigBase):
             self._data["link_type"] = "loopback"
             self._data["ether"] = "00:00:00:00:00:00"
             self._data["broadcast"] = "00:00:00:00:00:00"
+        elif "POINTOPOINT" in self._data["flags"]:
+            self._data["link_type"] = "none"
 
     def __iter__(self):
         for key, value in self._data:
@@ -538,7 +547,7 @@ class _IpAddress(_IfconfigBase):
         self._name = self._ifconfig._name
         self._data = {
             "ifindex": self._ifconfig["index"],
-            "link": None,  # async __update__ with self._get_link()
+            "link": self._ifconfig.link,
             "ifname": self._name,
             "flags": self._ifconfig["flags"],
             "eflags": self._ifconfig.get("eflags", {}).get("flags"),
@@ -572,18 +581,10 @@ class _IpAddress(_IfconfigBase):
     def __update__(self):
         self._data.update(
             {
-                "link": self._get_link(),
                 "master": self._get_master(),
                 "linkinfo": self._get_linkinfo(),
             }
         )
-
-    def _get_link(self):
-        if self._ifconfig.get("peer"):
-            return self._ifconfig["peer"]
-        if self._ifconfig.get("vlan", {}).get("parent"):
-            return self._ifconfig["vlan"]["parent"]
-        return None
 
     def _get_master(self):
         if self.link:
@@ -658,10 +659,48 @@ class _IpAddress(_IfconfigBase):
         return None
 
     def _get_info_slave_data(self):
-        if self._ifconfig.link:
-            if self._ifconfig.link.name.startswith("bond"):
+        if self.link:
+            if self.link.name.startswith("bond"):
                 # FIXME: where to find original hardawre lladdr?
                 return {"perm_hwaddr": self._ifconfig["ether"]}
+            if self.link.name.startswith("bridge"):
+                bridge = self.link._ifconfig._data["bridge"]
+                if member := next(
+                    (member for member in bridge["member"] if member["interface"] == self._name),
+                    None,
+                ):
+                    return {
+                        "state": "forwarding",
+                        "priority": int(member["priority"]),
+                        "cost": int(member["cost"]),
+                        # "hairpin": False,
+                        # "guard": False,
+                        # "root_block": False,
+                        # "fastleave": False,
+                        # "learning": True,
+                        # "flood": True,
+                        # "id": "0x8003",
+                        # "no": "0x3",
+                        "designated_port": int(member["port"]),
+                        "designated_cost": int(member["cost"]),
+                        "bridge_id": bridge["id"],
+                        "root_id": bridge["root_id"],
+                        # "hold_timer": 0.00,
+                        # "message_age_timer": 0.00,
+                        # "forward_delay_timer": 0.00,
+                        # "topology_change_ack": 0,
+                        # "config_pending": 0,
+                        # "proxy_arp": False,
+                        # "proxy_arp_wifi": False,
+                        # "multicast_router": 1,
+                        # "mcast_flood": True,
+                        # "mcast_to_unicast": False,
+                        # "neigh_suppress": False,
+                        # "group_fwd_mask": "0",
+                        # "group_fwd_mask_str": "0x0",
+                        # "vlan_tunnel": False,
+                        # "isolated": False,
+                    }
         return None
 
     def _get_linkinfo(self):
@@ -789,6 +828,75 @@ class _IpAddress(_IfconfigBase):
         return res.rstrip()
 
 
+class _Bridge(_IfconfigBase):
+    __slots__ = ("_ifconfig",)
+
+    _OPTIONAL_FIELDS = [
+        "hairpin",
+        "guard",
+        "root_block",
+        "fastleave",
+        "learning",
+        "flood",
+        "mcast_flood",
+        "mcast_to_unicast",
+        "neigh_suppress",
+        "vlan_tunnel",
+        "isolated",
+    ]
+
+    def __init__(self, text):
+        self._ifconfig = _Ifconfig(text)
+        self._name = self._ifconfig._name
+        self._data = {
+            "ifindex": self._ifconfig["index"],
+            "link": self._ifconfig.link,
+            "ifname": self._name,
+            "flags": self._ifconfig["flags"],
+            "mtu": self._ifconfig["mtu"],
+            "master": None,  # async __update__ with self._get_master()
+        }
+
+    def __update__(self):
+        if self.link == self:
+            self._data["master"] = self._name
+        else:
+            bridge = self.link._ifconfig._data["bridge"]
+            member = next(
+                member for member in bridge["member"] if member["interface"] == self._name
+            )
+            self._data.update(
+                {
+                    "master": self.link.name,
+                    "state": "forwarding",  # FIXME: how to check the state?
+                    "priority": int(member["priority"]),
+                    "cost": int(member["cost"]),
+                    # "hairpin": False,
+                    # "guard": False,
+                    # "root_block": False,
+                    # "fastleave": False,
+                    # "learning": True,
+                    # "flood": True,
+                    # "mcast_flood": True,
+                    # "mcast_to_unicast": False,
+                    # "neigh_suppress": False,
+                    # "vlan_tunnel": False,
+                    # "isolated": False,
+                }
+            )
+
+    def str(self, details=None):
+        data = self.data(details=details)
+        res = utils.dict_format(data, "{}: {}", "ifindex", "ifname")
+        res += utils.dict_format(data, "@{}", "link")
+        res += f": <{','.join(self['flags'])}> mtu {self['mtu']}"
+        res += utils.dict_format(data, " master {}", "master")
+        res += utils.dict_format(data, " state {}", "state")
+        res += utils.dict_format(data, " priority {}", "priority")
+        res += utils.dict_format(data, " cost {}", "cost")
+        return res
+
+
 class Ifconfig:
     __slots__ = "_interfaces"
     _kind = _Ifconfig
@@ -861,11 +969,30 @@ class IpAddress(Ifconfig):
             for index, member in enumerate(interface._ifconfig.get("bond", [])):
                 if member is None:
                     continue
-                if isinstance(member, str):
-                    self.lookup("ifname", member).link = interface
+                self.lookup("ifname", member).link = interface
             if interface._ifconfig.get("bridge"):
                 for member in interface._ifconfig["bridge"].get("member", []):
-                    if isinstance(member["interface"], str):
-                        self.lookup("ifname", member["interface"]).link = interface
+                    self.lookup("ifname", member["interface"]).link = interface
+        for interface in self._interfaces:
+            interface.__update__()
+
+
+class Bridge(Ifconfig):
+    _kind = _Bridge
+
+    def __init__(self):
+        super().__init__()
+        self._link_interfaces()
+
+    def _link_interfaces(self):
+        """
+        Look up for bridge interface relations
+        """
+        for interface in self._interfaces:
+            if interface._ifconfig.get("bridge"):
+                interface.link = interface
+                for member in interface._ifconfig["bridge"].get("member", []):
+                    self.lookup("ifname", member["interface"]).link = interface
+        self._interfaces = [interface for interface in self._interfaces if interface.link]
         for interface in self._interfaces:
             interface.__update__()

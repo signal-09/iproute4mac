@@ -1,7 +1,8 @@
+import iproute4mac.ifconfig as ifconfig
 import iproute4mac.libc as libc
 import iproute4mac.utils as utils
 
-from iproute4mac.ipaddress import get_ifconfig_links
+from iproute4mac import OPTION
 from iproute4mac.utils import matches, strcmp, next_arg
 
 
@@ -31,12 +32,74 @@ Usage: bridge link set dev DEV [ cost COST ] [ priority PRIO ] [ state STATE ]
 
 
 def brlink_modify(argv):
+    dev = None
+    while argv:
+        opt = argv.pop(0)
+        if strcmp(opt, "dev"):
+            dev = next_arg(argv)
+        elif strcmp(opt, "guard"):
+            guard = next_arg(argv)
+            utils.parse_on_off(opt, guard)
+            utils.do_notimplemented(opt)
+        elif strcmp(opt, "hairpin"):
+            hairpin = next_arg(argv)
+            utils.parse_on_off(opt, hairpin)
+            utils.do_notimplemented(opt)
+        elif strcmp(opt, "fastleave"):
+            fastleave = next_arg(argv)
+            utils.parse_on_off(opt, fastleave)
+            utils.do_notimplemented(opt)
+        elif strcmp(opt, "root_block"):
+            root_block = next_arg(argv)
+            utils.parse_on_off(opt, root_block)
+            utils.do_notimplemented(opt)
+        elif strcmp(opt, "learning"):
+            learning = next_arg(argv)
+            utils.parse_on_off(opt, learning)
+            utils.do_notimplemented(opt)
+        elif strcmp(opt, "learning_sync"):
+            learning_sync = next_arg(argv)
+            utils.parse_on_off(opt, learning_sync)
+            utils.do_notimplemented(opt)
+        elif strcmp(opt, "flood"):
+            flood = next_arg(argv)
+            utils.parse_on_off(opt, flood)
+            utils.do_notimplemented(opt)
+        elif strcmp(opt, "mcast_flood"):
+            mcast_flood = next_arg(argv)
+            utils.parse_on_off(opt, mcast_flood)
+            utils.do_notimplemented(opt)
+        elif strcmp(opt, "mcast_to_unicast"):
+            mcast_to_unicast = next_arg(argv)
+            utils.parse_on_off(opt, mcast_to_unicast)
+            utils.do_notimplemented(opt)
+        elif strcmp(opt, "cost"):
+            cost = next_arg(argv)
+            try:
+                cost = int(cost)
+            except ValueError:
+                utils.invarg(f'Invalid "{opt}" value', cost)
+            utils.do_notimplemented(opt)
+        elif strcmp(opt, "priority"):
+            priority = next_arg(argv)
+            try:
+                priority = int(priority)
+            except ValueError:
+                utils.invarg(f'Invalid "{opt}" value', priority)
+            utils.do_notimplemented(opt)
+        else:
+            usage()
+
+    if not dev:
+        utils.stderr("Device is a required argument.")
+        exit(libc.EXIT_ERROR)
+
     return libc.EXIT_SUCCESS
 
 
 def brlink_list(argv):
     dev = None
-    links = get_ifconfig_links(argv)
+    links = ifconfig.Bridge()
     while argv:
         opt = argv.pop(0)
         if strcmp(opt, "dev"):
@@ -47,7 +110,10 @@ def brlink_list(argv):
                 utils.stderr(f'Cannot find device "{opt}"')
                 exit(libc.EXIT_ERROR)
             dev = opt
-            links.set([l for l in links if l.ifname == dev])
+            links.set([i for i in links if i.name == dev])
+
+    if not OPTION["show_details"]:
+        links.set([i for i in links if i.link != i])
 
     utils.output(links)
 

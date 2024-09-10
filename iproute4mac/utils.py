@@ -81,6 +81,11 @@ def on_off_switch(key, arg):
     return key if arg == "on" else f"-{key}"
 
 
+def parse_on_off(key, arg):
+    if not strcmp(arg, "on", "off"):
+        on_off(key, arg)
+
+
 def incomplete_command():
     stderr('Command line is not complete. Try option "help"')
     exit(libc.EXIT_ERROR)
@@ -108,6 +113,30 @@ def isnumber(value):
 
 def empty(value):
     return value is None or (not isnumber(value) and not value)
+
+
+def _get_item(data, key):
+    value = None
+    if key in data:
+        return (True, data[key])
+    else:
+        for key, value in data.items():
+            if isinstance(value, dict):
+                (found, res) = _get_item(value, key)
+                if found:
+                    return (True, res)
+    return (False, None)
+
+
+def get_item(data, key):
+    """
+    Recurse search for `key` in `data` dict
+
+    Input:
+    `data` dictionary to search in
+    `key` key to find
+    """
+    return _get_item(data, key)[1]
 
 
 def find_item(data, key, value=None, recurse=True, strict=False):

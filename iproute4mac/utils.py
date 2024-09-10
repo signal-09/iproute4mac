@@ -102,37 +102,35 @@ def next_arg(argv):
         incomplete_command()
 
 
+def isnumber(value):
+    return isinstance(value, int | float | complex)
+
+
 def empty(value):
-    return value is None or (not isinstance(value, int | float | complex) and not value)
-
-
-def recurse_in(data, attr, val):
-    var = attr.pop(0)
-    if attr:
-        if var in data:
-            if isinstance(data[var], dict):
-                return recurse_in(data[var], attr, val)
-            elif isinstance(data[var], list):
-                return val in data[var]
-    else:
-        if var in data:
-            if isinstance(data[var], list):
-                return val in data[var]
-            return data[var] == val
-
-    return False
+    return value is None or (not isnumber(value) and not value)
 
 
 def find_item(data, key, value=None, recurse=True, strict=False):
+    """
+    Search for `key` in `data` dict
+
+    Input:
+    `data` dictionary to search in
+    `key` key to find
+    `value` (optional) specific value to find
+    `strict` (optional) return bool(value) (e.g. True/False instead of "", [], {})
+    """
     if key in data:
         if value is not None:
             return data[key] == value
         if strict:
-            return bool(data[key])
+            return isnumber(data[key]) or bool(data[key])
         return data[key] is not None
-    for k, v in data.items():
-        if recurse and isinstance(v, dict):
-            return find_item(v, key, value=value, strict=strict)
+    if recurse:
+        for k, v in data.items():
+            if isinstance(v, dict):
+                if find_item(v, key, value=value, recurse=recurse, strict=strict):
+                    return True
     return False
 
 
@@ -146,6 +144,38 @@ def delete_keys(data, *args):
     for entry in data:
         for arg in args:
             entry.pop(arg, None)
+
+
+def list_filter(data):
+    """
+    Recursively remove empty values
+    """
+
+    res = []
+    for value in data:
+        if isinstance(value, dict):
+            value = dict_filter(value)
+        elif isinstance(value, list):
+            value = list_filter(value)
+        if not empty(value):
+            res.append(value)
+    return res
+
+
+def dict_filter(data):
+    """
+    Recursively remove empty values
+    """
+
+    res = {}
+    for key, value in data.items():
+        if isinstance(value, dict):
+            value = dict_filter(value)
+        elif isinstance(value, list):
+            value = list_filter(value)
+        if not empty(value):
+            res[key] = value
+    return res
 
 
 # int.bit_count() only in Python >=3.10
@@ -251,20 +281,28 @@ def flat_tuple(*args):
     return res
 
 
-def strcmp(opt, *args):
-    return any(arg == opt for arg in flat_tuple(*args))
+def strcmp(opt, *args, case=True):
+    if case:
+        return any(arg == opt for arg in flat_tuple(*args))
+    return any(arg.casefold() == opt.casefold() for arg in flat_tuple(*args))
 
 
-def matches(opt, *args):
-    return any(arg.startswith(opt) for arg in flat_tuple(*args))
+def matches(opt, *args, case=True):
+    if case:
+        return any(arg.startswith(opt) for arg in flat_tuple(*args))
+    return any(arg.casefold().startswith(opt.casefold()) for arg in flat_tuple(*args))
 
 
-def startwith(opt, *args):
-    return any(opt.startswith(arg) for arg in flat_tuple(*args))
+def startwith(opt, *args, case=True):
+    if case:
+        return any(opt.startswith(arg) for arg in flat_tuple(*args))
+    return any(opt.casefold().startswith(arg.casefold()) for arg in flat_tuple(*args))
 
 
-def endwith(opt, *args):
-    return any(opt.endswith(arg) for arg in flat_tuple(*args))
+def endwith(opt, *args, case=True):
+    if case:
+        return any(opt.endswith(arg) for arg in flat_tuple(*args))
+    return any(opt.casefold().endswith(arg.casefold()) for arg in flat_tuple(*args))
 
 
 def matches_color(opt):
@@ -315,7 +353,7 @@ def shell(*args, fatal=True):
         warn(cmd.stderr)
         if cmd.stdout:
             debug(f"STDOUT\n{cmd.stdout}^^^ STDOUT ^^^")
-    return cmd.stdout
+    return cmd.stdout.rstrip()
 
 
 def get_prefsrc(host):

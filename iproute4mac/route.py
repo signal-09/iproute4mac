@@ -233,9 +233,8 @@ class Routes:
 
     def __init__(self):
         res = utils.shell(_NETSTAT, "-n", "-r")
-        links = ifconfig.Ifconfig()
-        inet4 = [a["address"] for i in links for a in i["inet"]]
-        inet6 = [a["address"] for i in links for a in i["inet6"]]
+        links = ifconfig.IpAddress()
+        inet = [a["local"] for i in links for a in i["addr_info"]]
         self._routes = []
         for route in self._route.finditer(res):
             dst, prefix, gateway, flags, dev, expire = route.groups()
@@ -250,7 +249,7 @@ class Routes:
                 continue
             dst = Prefix(f"{dst}/{prefix}", pack=True) if prefix is not None else Prefix(dst)
             if not dst.is_default and not dst.is_host:
-                src = next((a for a in inet4 + inet6 if a in dst), None)
+                src = next((a for a in inet if a in dst), None)
             else:
                 src = None
             self._routes.append(_Route(dst, prefix, gateway, flags, dev, expire, src))

@@ -180,11 +180,7 @@ def ipaddr_modify(cmd, argv):
 
 
 def get_ifconfig_links():
-    return ifconfig.Ifconfig(
-        kind=ifconfig._IpLink
-        if OPTION["preferred_family"] == socket._AF_PACKET
-        else ifconfig._IpAddress
-    )
+    return ifconfig.IpAddress()
 
 
 def get_links(argv, usage=usage):
@@ -248,7 +244,7 @@ def get_links(argv, usage=usage):
                 utils.stderr(f'Device "{opt}" does not exist.')
                 exit(libc.EXIT_ERROR)
             dev = opt
-            links.set([i for i in links.interfaces if i.name == dev])
+            links.set([i for i in links if i.name == dev])
 
     return links
 
@@ -270,16 +266,16 @@ def ipaddr_list_or_flush(argv, flush=False):
         socket._AF_BRIDGE,
     ):
         family = socket.family_name(OPTION["preferred_family"])
-        links.set([i for i in links.interfaces if i.present(family, strict=True)])
-    for interface in links.interfaces:
-        for af_family in (socket._AF_INET, socket._AF_INET6, socket._AF_MPLS, socket._AF_BRIDGE):
-            if af_family != OPTION["preferred_family"]:
-                del interface[socket.family_name(af_family)]
+        for interface in links:
+            interface["addr_info"] = [
+                addr for addr in interface["addr_info"] if addr["family"] == family
+            ]
+        links.set([i for i in links if i.present("addr_info", strict=True)])
 
     if flush:
         for interface in links.list():
             for addr in interface["addr_info"]:
-                ifconfig.run(interface["ifname"], addr["family"], addr["local"], "-alias")
+                ifconfig.run(interface.name, addr["family"], addr["local"], "-alias")
     else:
         utils.output(links)
 

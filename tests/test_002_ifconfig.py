@@ -9,11 +9,12 @@ def shell(cmd):
 
 
 def test_Ifconfig():
-    links = ifconfig.Ifconfig(kind=ifconfig._Ifconfig)
+    links = ifconfig.Ifconfig()
 
-    _LO0 = shell(ifconfig._IFCONFIG + " " + " ".join(ifconfig._IFCONFIG_OPTS) + " lo0")
+    _LO0 = ifconfig.run(ifconfig._IFCONFIG_OPTS, "lo0")
     lo0 = links.lookup("interface", "lo0")
     assert str(lo0) == _LO0
 
-    # en0 = links.lookup("interface", "en0")
-    # assert str(en0) == _EN0
+    _EN0 = ifconfig.run(ifconfig._IFCONFIG_OPTS, "en0")
+    en0 = links.lookup("interface", "en0")
+    assert str(en0) == _EN0

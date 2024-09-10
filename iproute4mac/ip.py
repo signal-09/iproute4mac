@@ -4,6 +4,7 @@ import iproute4mac
 import os
 import sys
 
+import iproute4mac.debug as debug
 import iproute4mac.ipaddress as ipaddress
 import iproute4mac.iplink as iplink
 import iproute4mac.ipneigh as ipneigh
@@ -79,6 +80,7 @@ OBJS = [
     ("ioam", utils.do_notimplemented),
     ("help", do_help),
     ("stats", utils.do_notimplemented),
+    ("debug", debug.do_debug),
 ]
 
 
@@ -201,7 +203,7 @@ def main():
         elif matches(opt, "-quiet"):
             OPTION["verbose"] = -1
         elif matches(opt, "-debug"):
-            pass
+            debug.all()
         else:
             utils.stderr(f'Option "{opt}" is unknown, try "ip -help".')
             exit(libc.EXIT_ERROR)

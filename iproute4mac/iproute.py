@@ -1,3 +1,4 @@
+import iproute4mac.data as data
 import iproute4mac.libc as libc
 import iproute4mac.prefix as prefix
 import iproute4mac.route as route
@@ -523,7 +524,7 @@ def iproute_list(argv):
         elif strcmp(opt, "dev", "oif", "iif"):
             dev = next_arg(argv)
             entries.set([e for e in entries if e.get("dev") == dev])
-            utils.delete_keys(entries, "dev")
+            data.delete_keys(entries, "dev")
         elif strcmp(opt, "mark"):
             mark = next_arg(argv)
             utils.do_notimplemented(mark)
@@ -543,13 +544,13 @@ def iproute_list(argv):
                 via = next_arg(argv)
             via = get_prefix(via, family)
             entries.set([e for e in entries if e.present("gateway") and via in e["gateway"]])
-            utils.delete_keys(entries, "gateway")
+            data.delete_keys(entries, "gateway")
         elif strcmp(opt, "src"):
             src = get_prefix(next_arg(argv), OPTION["preferred_family"])
             if not src._is_default:
                 entries.set([e for e in entries if e.source_from(src)])
                 if src.is_host:
-                    utils.delete_keys(entries, "prefsrc")
+                    data.delete_keys(entries, "prefsrc")
         elif matches(opt, "realms"):
             realm = next_arg(argv)
             utils.do_notimplemented(realm)
@@ -587,6 +588,7 @@ def iproute_list(argv):
 
     if OPTION["preferred_family"] != socket._AF_UNSPEC:
         entries.set([e for e in entries if e["dst"].family == OPTION["preferred_family"]])
+
     utils.output(entries)
 
     return libc.EXIT_SUCCESS

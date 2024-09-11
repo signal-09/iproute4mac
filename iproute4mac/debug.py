@@ -17,14 +17,27 @@ Usage: ip debug { address | neigh | route }""")
 
 
 def debug_address(argv=[]):
+    utils.stdout('Testing "ifconfig":... ')
+
     old_options = utils.options_override({"show_details": True, "json": True, "pretty": True})
     interfaces = ifconfig.Ifconfig()
     utils.options_restore(old_options)
     ip_ifconfig = str(interfaces)
     os_ifconfig = ifconfig.run()
 
-    if diff := list(unified_diff(ip_ifconfig.splitlines(), os_ifconfig.splitlines(), n=10000)):
-        print("\n".join(list(diff)))
+    if diff := list(
+        unified_diff(
+            ip_ifconfig.splitlines(),
+            os_ifconfig.splitlines(),
+            fromfile="iproute4mac",
+            tofile="ifconfig",
+            n=50,
+        )
+    ):
+        utils.stdout(end="\n")
+        utils.stdout("\n".join(list(diff)), end="\n")
+    else:
+        utils.stdout("OK", end="\n")
 
 
 def debug_neigh(argv=[]):

@@ -107,106 +107,6 @@ def next_arg(argv):
         incomplete_command()
 
 
-def isnumber(value):
-    return isinstance(value, int | float | complex)
-
-
-def empty(value):
-    return value is None or (not isnumber(value) and not value)
-
-
-def _get_item(data, key):
-    value = None
-    if key in data:
-        return (True, data[key])
-    else:
-        for key, value in data.items():
-            if isinstance(value, dict):
-                (found, res) = _get_item(value, key)
-                if found:
-                    return (True, res)
-    return (False, None)
-
-
-def get_item(data, key):
-    """
-    Recurse search for `key` in `data` dict
-
-    Input:
-    `data` dictionary to search in
-    `key` key to find
-    """
-    return _get_item(data, key)[1]
-
-
-def find_item(data, key, value=None, recurse=True, strict=False):
-    """
-    Search for `key` in `data` dict
-
-    Input:
-    `data` dictionary to search in
-    `key` key to find
-    `value` (optional) specific value to find
-    `strict` (optional) return bool(value) (e.g. True/False instead of "", [], {})
-    """
-    if key in data:
-        if value is not None:
-            return data[key] == value
-        if strict:
-            return isnumber(data[key]) or bool(data[key])
-        return data[key] is not None
-    if recurse:
-        for k, v in data.items():
-            if isinstance(v, dict):
-                if find_item(v, key, value=value, recurse=recurse, strict=strict):
-                    return True
-    return False
-
-
-def dict_format(data, string, *fields, default=None):
-    if not data or not fields or empty(data.get(fields[0], default)):
-        return ""
-    return string.format(*[data.get(field, default) for field in fields])
-
-
-def delete_keys(data, *args):
-    for entry in data:
-        for arg in args:
-            entry.pop(arg, None)
-
-
-def list_filter(data):
-    """
-    Recursively remove empty values
-    """
-
-    res = []
-    for value in data:
-        if isinstance(value, dict):
-            value = dict_filter(value)
-        elif isinstance(value, list):
-            value = list_filter(value)
-        if not empty(value):
-            res.append(value)
-    return res
-
-
-def dict_filter(data):
-    """
-    Recursively remove empty values
-    """
-
-    res = {}
-    for key, value in data.items():
-        if isinstance(value, dict):
-            value = dict_filter(value)
-        elif isinstance(value, list):
-            value = list_filter(value)
-        if not empty(value):
-            res[key] = value
-    return res
-
-
 # int.bit_count() only in Python >=3.10
 def bit_count(self):
     return bin(self).count("1")
@@ -382,7 +282,7 @@ def shell(*args, fatal=True):
         warn(cmd.stderr)
         if cmd.stdout:
             debug(f"STDOUT\n{cmd.stdout}^^^ STDOUT ^^^")
-    return cmd.stdout.rstrip()
+    return cmd.stdout.rstrip("\n")
 
 
 def get_prefsrc(host):

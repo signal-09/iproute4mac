@@ -4,6 +4,7 @@ import iproute4mac.socket as socket
 import iproute4mac.utils as utils
 
 from iproute4mac import OPTION
+from iproute4mac.data import _Item, _Items, dict_format, find_item
 from iproute4mac.ifconfig import IPV4ADDR, IPV6ADDR, LLADDR, IFNAME
 from iproute4mac.prefix import Prefix
 from iproute4mac.utils import matches, strcmp
@@ -106,23 +107,21 @@ def delete(host, dev=None):
         utils.shell(_NDP, "-d", f"{host}%{dev}" if dev else host)
 
 
-class _Nud:
-    __slots__ = ("_nud", "_incomplete", "_permanent", "_expired")
-
+class _Nud(_Item):
     def __init__(self, dst, lladdr, dev, exp_o, exp_i, state=None, flag=None):
         self._incomplete = lladdr.find("incomplete") > -1
         self._permanent = strcmp("(none)", exp_o, exp_i)
         self._expired = strcmp("expired", exp_o, exp_i)
-        self._nud = {"dst": Prefix(dst), "dev": dev}
+        self._data = {"dst": Prefix(dst), "dev": dev}
         if not self._incomplete:
-            self._nud["lladdr"] = lladdr
+            self._data["lladdr"] = lladdr
         # FIXME: how to detect other states (e.g. NOARP)?
         if state:
             state = from_flag(state)
             if flag == "p":
-                self._nud["proxy"] = None
+                self._data["proxy"] = None
             elif flag == "R":
-                self._nud["router"] = None
+                self._data["router"] = None
         else:
             if self._incomplete:
                 state = _NUD_FAILED
@@ -130,53 +129,22 @@ class _Nud:
                 state = _NUD_STALE
             else:
                 state = _NUD_REACHABLE
-        self._nud["state"] = [to_state(state)]
-
-    def __contains__(self, other):
-        return other in self._nud
-
-    def __str__(self):
-        return self.str()
-
-    def __iter__(self):
-        for k, v in self._nud:
-            yield k, v
-
-    def __getitem__(self, key):
-        return self._nud.get(key)
-
-    def __setitem__(self, key, value):
-        self._nud[key] = value
-
-    def __delitem__(self, key):
-        if key in self._nud:
-            del self._nud[key]
+        self._data["state"] = [to_state(state)]
 
     def _format(self, string, *fields, default=None):
-        return utils.dict_format(self._nud, string, *fields, default=default)
+        return dict_format(self._data, string, *fields, default=default)
 
     @property
     def unused(self):
-        return to_state(_NUD_REACHABLE) not in self._nud["state"]
-
-    def get(self, key, value=None):
-        return self._nud.get(key, value)
-
-    def pop(self, key, value=None):
-        if value is None:
-            return self._nud.pop(key)
-        return self._nud.pop(key, value)
-
-    def dict(self, details=True):
-        return self._nud
+        return to_state(_NUD_REACHABLE) not in self._data["state"]
 
     def str(self, details=True):
-        res = str(self._nud["dst"])
+        res = str(self._data["dst"])
         res += self._format(" dev {}", "dev")
         res += self._format(" lladdr {}", "lladdr")
         for key in ["router", "proxy"]:
             res += self._format(f" {key}", key)
-        res += f" {self._nud['state'][0]}"
+        res += f" {self._data['state'][0]}"
         return res
 
 

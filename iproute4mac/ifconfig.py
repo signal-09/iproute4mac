@@ -3,6 +3,7 @@ import re
 import iproute4mac.libc as libc
 import iproute4mac.utils as utils
 
+from iproute4mac.data import _Item, _Items, dict_format, find_item
 from iproute4mac.prefix import Prefix
 
 
@@ -64,13 +65,21 @@ def netmask_to_length(mask):
 
 
 class _reBase:
-    __slots__ = "_data"
+    __slots__ = ("_data",)
 
     def __init__(self, pattern, text):
         if not isinstance(pattern, re.Pattern):
             raise ValueError("pattern is not of {re.Pattern}")
         if not isinstance(text, str):
             raise ValueError("data is not of {str}")
+
+    def expand_groupdict(self, data):
+        res = {}
+        for key, value in data.items():
+            if key == "flags":
+                value = value.split(",") if value else []
+            res[key] = value
+        return res
 
     @property
     def data(self):
@@ -88,7 +97,7 @@ class _reList(_reBase):
         self._data = []
         for res in pattern.finditer(text):
             if res.groupdict():
-                self._data.append(res.groupdict())
+                self._data.append(self.expand_groupdict(res.groupdict()))
             elif res.groups():
                 self._data.extend(res.groups())
             else:
@@ -107,7 +116,7 @@ class _reDict(_reBase):
 
     @property
     def data(self):
-        return self.groupdict()
+        return self.expand_groupdict(self.groupdict())
 
     def groupdict(self):
         return self._data.groupdict() if self._data else {}
@@ -167,51 +176,24 @@ class _reBond(_reList):
             self._data = _reList(self._list, text).data
 
 
-class _IfconfigBase:
+class _IfconfigBase(_Item):
     _name = None
-    _data = None
     _link = None
-    _OPTIONAL_FIELDS = [
-        "eflags",
-        "xflags",
-        "options",
-        "capabilities",
-        "hwassist",
-        "promiscuity",
-        "min_mtu",
-        "max_mtu",
-        "linkinfo",
-        "num_tx_queues",
-        "num_rx_queues",
-        "gso_max_size",
-        "gso_max_segs",
-    ]
-
-    def __init__(self):
-        raise NotImplementedError
-
-    def __contains__(self, element):
-        return not utils.empty(self._data.get(element))
-
-    def __iter__(self):
-        for key, value in self._data:
-            yield key, value
-
-    def __getitem__(self, key):
-        return self._data[key]
-
-    def __setitem__(self, key, value):
-        self._data[key] = value
-
-    def __delitem__(self, key):
-        if key in self._data:
-            del self._data[key]
-
-    def __str__(self):
-        return self.str()
-
-    def get(self, key, default=None):
-        return self._data.get(key, default)
+    _OPTIONAL_FIELDS = {
+        "eflags": None,
+        "xflags": None,
+        "options": None,
+        "capabilities": None,
+        "hwassist": None,
+        "promiscuity": None,
+        "min_mtu": None,
+        "max_mtu": None,
+        "linkinfo": None,
+        "num_tx_queues": None,
+        "num_rx_queues": None,
+        "gso_max_size": None,
+        "gso_max_segs": None,
+    }
 
     @property
     def name(self):
@@ -226,35 +208,6 @@ class _IfconfigBase:
         if not isinstance(link, _IfconfigBase):
             raise ValueError(f"link must by of {_IfconfigBase}")
         self._link = link
-
-    def data(self, details=True):
-        res = {}
-        for key, value in self._data.items():
-            if value is None:
-                continue
-            if key not in self._OPTIONAL_FIELDS or details:
-                res[key] = value
-        return res
-
-    def present(self, key, value=None, recurse=False, strict=False):
-        return utils.find_item(self._data, key, value=value, recurse=recurse, strict=strict)
-
-    def _value(self, key, value):
-        return value
-
-    def _dict(self, data):
-        res = {}
-        for key, value in data.items():
-            value = self._value(key, value)
-            if not utils.empty(value):
-                res[key] = value
-        return res
-
-    def dict(self, details=True):
-        return self._dict(self.data(details=details))
-
-    def str(self, details=True):
-        raise NotImplementedError
 
 
 class _Ifconfig(_IfconfigBase):
@@ -314,14 +267,6 @@ class _Ifconfig(_IfconfigBase):
     _routermode4 = re.compile(r"\troutermode4: (?P<routermode4>\w+)")
     _routermode6 = re.compile(r"\troutermode6: (?P<routermode6>\w+)")
 
-    @property
-    def link(self):
-        if self._data.get("peer"):
-            return self._data["peer"]
-        if self._data.get("vlan", {}).get("parent"):
-            return self._data["vlan"]["parent"]
-        return None
-
     def __init__(self, text):
         (self._name, text) = _reDict(self._name_data, text).groups()
 
@@ -375,67 +320,17 @@ class _Ifconfig(_IfconfigBase):
         elif "POINTOPOINT" in self._data["flags"]:
             self._data["link_type"] = "none"
 
-    def __iter__(self):
-        for key, value in self._data:
-            yield key, self._value(key, value)
-
-    def __getitem__(self, key):
-        return self._value(key, self._data[key])
-
-    def get(self, key, default=None):
-        return self._value(key, self._data.get(key, default))
-
-    def _cast(self, value):
-        if value.isdigit():
-            return int(value)
-        if value.replace(".", "", 1).isdigit():
-            return float(value)
-        if value == "<none>":
-            return None
-        if utils.strcmp(value, "true", "yes", "enabled", case=False):
-            return True
-        if utils.strcmp(value, "false", "no", "disabled", case=False):
-            return False
-        return value
-
-    def _value(self, key, value):
-        if isinstance(value, dict):
-            return self._dict(value)
-        if isinstance(value, list):
-            return self._list(value)
-        if key == "flag":
-            return value
-        if key == "flags":
-            return value.split(",") if value else []
-        if key == "list":
-            return value.split(" ") if value else []
-        if value is not None:
-            return self._cast(value)
-        return value
-
-    def _list(self, data):
-        res = []
-        for value in data:
-            if isinstance(value, dict):
-                value = self._dict(value)
-            elif isinstance(value, list):
-                value = self._list(value)
-            elif value is not None:
-                value = self._cast(value)
-            res.append(value)
-        return res
-
     def str(self, details=True):
         data = self.data(details=details)
-        res = f"{self._name}: flags={data['flag']}<{data['flags']}>"
-        res += utils.dict_format(data, " mtu {}", "mtu")
-        res += utils.dict_format(data, " rtref {}", "rtref")
+        res = f"{self._name}: flags={data['flag']}<{','.join(data['flags'])}>"
+        res += dict_format(data, " mtu {}", "mtu")
+        res += dict_format(data, " rtref {}", "rtref")
         res += f" index {data['index']}\n"
         for flags in ["eflags", "xflags", "options", "capabilities", "hwassist"]:
             if data.get(flags):
-                res += f"\t{flags}={data[flags]['flag']}<{data[flags]['flags']}>\n"
+                res += f"\t{flags}={data[flags]['flag']}<{','.join(data[flags]['flags'])}>\n"
         if self._data["link_type"] != "loopback":
-            res += utils.dict_format(data, "\tether {}\n", "ether")
+            res += dict_format(data, "\tether {}\n", "ether")
         if data.get("bridge"):
             bridge = data["bridge"]
             res += "\tConfiguration:\n"
@@ -444,40 +339,38 @@ class _Ifconfig(_IfconfigBase):
             res += f"\t\troot id {bridge['root_id']} priority {bridge['root_priority']} ifcost {bridge['root_cost']} port {bridge['root_port']}\n"
             res += f"\t\tipfilter {bridge['ipfilter']} flags {bridge['flag']}\n"
             for member in bridge.get("member", []):
-                res += (
-                    f"\tmember: {member['interface']} flags={member['flag']}<{member['flags']}>\n"
-                )
+                res += f"\tmember: {member['interface']} flags={member['flag']}<{','.join(member['flags'])}>\n"
                 res += f"\t        ifmaxaddr {member['ifmaxaddr']} port {member['port']} priority {member['priority']} path cost {member['cost']}\n"
                 res += f"\t        hostfilter {member['hostfilter']} hw: {member['hw']} ip: {member['ip']}\n"
             # res += "\tAddress cache:\n"
         if self.name.startswith("feth"):
-            res += utils.dict_format(data, "\tpeer: {}\n", "peer", default="<none>")
+            res += dict_format(data, "\tpeer: {}\n", "peer", default="<none>")
         for addr in data.get("address", []):
             res += f"\t{addr['family']} {addr['address']}"
-            res += utils.dict_format(addr, "%{}", "net")
-            res += utils.dict_format(addr, " --> {}", "peer")
-            res += utils.dict_format(addr, "/{}", "prefixlen")
-            res += utils.dict_format(addr, " broadcast {}", "broadcast")
-            res += utils.dict_format(addr, " {}", "autoconf")
-            res += utils.dict_format(addr, " {}", "secured")
-            res += utils.dict_format(addr, " pltime {}", "pltime")
-            res += utils.dict_format(addr, " vltime {}", "vltime")
-            res += utils.dict_format(addr, " scopeid {}", "scopeid")
+            res += dict_format(addr, "%{}", "net")
+            res += dict_format(addr, " --> {}", "peer")
+            res += dict_format(addr, "/{}", "prefixlen")
+            res += dict_format(addr, " broadcast {}", "broadcast")
+            res += dict_format(addr, " {}", "autoconf")
+            res += dict_format(addr, " {}", "secured")
+            res += dict_format(addr, " pltime {}", "pltime")
+            res += dict_format(addr, " vltime {}", "vltime")
+            res += dict_format(addr, " scopeid {}", "scopeid")
             res += "\n" if addr["family"] == "inet" else " \n"
-        res += utils.dict_format(
+        res += dict_format(
             data.get("vlan"), "\tvlan: {} parent interface: {}\n", "vlanid", "parent"
         )
-        res += utils.dict_format(data, "\tnetif: {}\n", "netif")
-        res += utils.dict_format(data, "\tflowswitch: {}\n", "flowswitch")
+        res += dict_format(data, "\tnetif: {}\n", "netif")
+        res += dict_format(data, "\tflowswitch: {}\n", "flowswitch")
         if data.get("nd6_options"):
-            res += f"\tnd6 options={data['nd6_options']['flag']}<{data['nd6_options']['flags']}>\n"
-        res += utils.dict_format(data, "\tmedia: {}\n", "media")
-        res += utils.dict_format(data, "\tstatus: {}\n", "status")
+            res += f"\tnd6 options={data['nd6_options']['flag']}<{','.join(data['nd6_options']['flags'])}>\n"
+        res += dict_format(data, "\tmedia: {}\n", "media")
+        res += dict_format(data, "\tstatus: {}\n", "status")
         if data.get("media"):
             res += "\tsupported media:\n"
             for media in data.get("supported_media", []):
                 if media["type"]:
-                    res += utils.dict_format(media, "\t\tmedia {}", "type")
+                    res += dict_format(media, "\t\tmedia {}", "type")
                     for opt in media["opts"]:
                         res += f" mediaopt {opt}"
                 else:
@@ -486,10 +379,10 @@ class _Ifconfig(_IfconfigBase):
         if self._name.startswith("bond"):
             members = " ".join(data["bond"]) if data["bond"] else "<none>"
             res += f"\tbond interfaces: {members}\n"
-        res += utils.dict_format(data, "\tgeneration id: {}\n", "generation_id")
-        res += utils.dict_format(data, "\ttype: {}\n", "type")
+        res += dict_format(data, "\tgeneration id: {}\n", "generation_id")
+        res += dict_format(data, "\ttype: {}\n", "type")
         for agent in data.get("agent", []):
-            res += utils.dict_format(
+            res += dict_format(
                 agent,
                 '\tagent domain:{} type:{} flags:{} desc:"{}"\n',
                 "domain",
@@ -497,19 +390,17 @@ class _Ifconfig(_IfconfigBase):
                 "flag",
                 "desc",
             )
-        res += utils.dict_format(
-            data.get("link_quality"), "\tlink quality: {} ({})\n", "quality", "desc"
-        )
-        res += utils.dict_format(
+        res += dict_format(data.get("link_quality"), "\tlink quality: {} ({})\n", "quality", "desc")
+        res += dict_format(
             data.get("state_availability"),
             "\tstate availability: {} ({})\n",
             "availability",
             "desc",
         )
-        res += utils.dict_format(data.get("scheduler"), "\tscheduler: {} {}\n", "type", "desc")
-        res += utils.dict_format(data, "\teffective interface: {}\n", "effective_interface")
-        res += utils.dict_format(data.get("link_rate"), "\tlink rate: {} {}\n", "rate", "rate_um")
-        res += utils.dict_format(
+        res += dict_format(data.get("scheduler"), "\tscheduler: {} {}\n", "type", "desc")
+        res += dict_format(data, "\teffective interface: {}\n", "effective_interface")
+        res += dict_format(data.get("link_rate"), "\tlink rate: {} {}\n", "rate", "rate_um")
+        res += dict_format(
             data.get("uplink_rate"),
             "\tuplink rate: {} {} [eff] / {} {}\n",
             "eff",
@@ -517,7 +408,7 @@ class _Ifconfig(_IfconfigBase):
             "max",
             "max_um",
         )
-        res += utils.dict_format(
+        res += dict_format(
             data.get("downlink_rate"),
             "\tdownlink rate: {} {} [eff] / {} {} [max]\n",
             "eff",
@@ -525,17 +416,17 @@ class _Ifconfig(_IfconfigBase):
             "max",
             "max_um",
         )
-        res += utils.dict_format(data, "\ttimestamp: {}\n", "timestamp")
-        res += utils.dict_format(
+        res += dict_format(data, "\ttimestamp: {}\n", "timestamp")
+        res += dict_format(
             data.get("qosmarking"),
             "\tqosmarking enabled: {} mode: {}\n",
             "enabled",
             "mode",
         )
-        res += utils.dict_format(data, "\tlow power mode: {}\n", "low_power_mode")
-        res += utils.dict_format(data, "\tmulti layer packet logging (mpklog): {}\n", "mpklog")
-        res += utils.dict_format(data, "\troutermode4: {}\n", "routermode4")
-        res += utils.dict_format(data, "\troutermode6: {}\n", "routermode6")
+        res += dict_format(data, "\tlow power mode: {}\n", "low_power_mode")
+        res += dict_format(data, "\tmulti layer packet logging (mpklog): {}\n", "mpklog")
+        res += dict_format(data, "\troutermode4: {}\n", "routermode4")
+        res += dict_format(data, "\troutermode6: {}\n", "routermode6")
         return res.rstrip()
 
 
@@ -547,7 +438,7 @@ class _IpAddress(_IfconfigBase):
         self._name = self._ifconfig._name
         self._data = {
             "ifindex": self._ifconfig["index"],
-            "link": self._ifconfig.link,
+            "link": self._get_link(),
             "ifname": self._name,
             "flags": self._ifconfig["flags"],
             "eflags": self._ifconfig.get("eflags", {}).get("flags"),
@@ -586,10 +477,15 @@ class _IpAddress(_IfconfigBase):
             }
         )
 
-    def _get_master(self):
-        if self.link:
-            return self.link.name
+    def _get_link(self):
+        if self._ifconfig.get("peer"):
+            return self._ifconfig["peer"]
+        if self._ifconfig.get("vlan", {}).get("parent"):
+            return self._ifconfig["vlan"]["parent"]
         return None
+
+    def _get_master(self):
+        return self.link.name if self.link else None
 
     def _get_info_kind(self):
         if utils.startwith(self._ifconfig["interface"], "bridge", "bond", "feth", "vlan"):
@@ -649,6 +545,7 @@ class _IpAddress(_IfconfigBase):
                     # "nf_call_iptables": 0,
                     # "nf_call_ip6tables": 0,
                     # "nf_call_arptables": 0,
+                    "ipfilter": self._ifconfig["bridge"]["ipfilter"],
                 }
             )
         return info_data if info_data else None
@@ -718,11 +615,11 @@ class _IpAddress(_IfconfigBase):
             addr = {"family": inet["family"], "local": inet["address"]}
             if inet.get("peer"):
                 addr["address"] = inet["peer"]
-            if utils.find_item(inet, "prefixlen"):
+            if find_item(inet, "prefixlen"):
                 addr["prefixlen"] = inet["prefixlen"]
-            if utils.find_item(inet, "netmask"):
+            if find_item(inet, "netmask"):
                 addr["prefixlen"] = netmask_to_length(inet["netmask"])
-            if utils.find_item(inet, "broadcast"):
+            if find_item(inet, "broadcast"):
                 addr["broadcast"] = inet["broadcast"]
             if ip.is_link:
                 addr["scope"] = "link"
@@ -746,51 +643,32 @@ class _IpAddress(_IfconfigBase):
             addr_info.append(addr)
         return addr_info
 
-    def _value(self, key, value):
-        if isinstance(value, dict):
-            return self._dict(value)
-        if isinstance(value, list):
-            return self._list(value)
-        return value
-
-    def _list(self, data):
-        res = []
-        for value in data:
-            if isinstance(value, dict):
-                value = self._dict(value)
-            elif isinstance(value, list):
-                value = self._list(value)
-            res.append(value)
-        return res
-
     def str(self, details=None):
         data = self.data(details=details)
-        res = utils.dict_format(data, "{}: {}", "ifindex", "ifname")
-        res += utils.dict_format(data, "@{}", "link")
+        res = dict_format(data, "{}: {}", "ifindex", "ifname")
+        res += dict_format(data, "@{}", "link")
         res += f": <{','.join(self['flags'])}> mtu {self['mtu']}"
-        res += utils.dict_format(data, " master {}", "master")
-        res += utils.dict_format(data, " state {}", "operstate")
-        res += utils.dict_format(data, " qlen {}", "txqlen")
+        res += dict_format(data, " master {}", "master")
+        res += dict_format(data, " state {}", "operstate")
+        res += dict_format(data, " qlen {}", "txqlen")
         res += "\n"
 
-        res += utils.dict_format(data, "    link/{}", "link_type")
-        res += utils.dict_format(data, " {}", "address")
-        res += utils.dict_format(data, " brd {}", "broadcast")
-        res += utils.dict_format(data, " minmtu {}", "min_mtu")
-        res += utils.dict_format(data, " maxmtu {}", "max_mtu")
-        res += utils.dict_format(data, " numtxqueues {}", "num_tx_queues")
-        res += utils.dict_format(data, " numrxqueues {}", "num_rx_queues")
-        res += utils.dict_format(data, " gso_max_size {}", "gso_max_size")
-        res += utils.dict_format(data, " gso_max_segs {}", "gso_max_segs")
+        res += dict_format(data, "    link/{}", "link_type")
+        res += dict_format(data, " {}", "address")
+        res += dict_format(data, " brd {}", "broadcast")
+        res += dict_format(data, " minmtu {}", "min_mtu")
+        res += dict_format(data, " maxmtu {}", "max_mtu")
+        res += dict_format(data, " numtxqueues {}", "num_tx_queues")
+        res += dict_format(data, " numrxqueues {}", "num_rx_queues")
+        res += dict_format(data, " gso_max_size {}", "gso_max_size")
+        res += dict_format(data, " gso_max_segs {}", "gso_max_segs")
         res += "\n"
 
         if data.get("linkinfo", {}).get("info_kind"):
             info = data["linkinfo"]
-            res += utils.dict_format(info, "    {}", "info_kind")
+            res += dict_format(info, "    {}", "info_kind")
             if info["info_kind"] == "vlan":
-                res += utils.dict_format(
-                    info.get("info_data"), " protocol {} id {} ", "protocol", "id"
-                )
+                res += dict_format(info.get("info_data"), " protocol {} id {} ", "protocol", "id")
             elif info["info_kind"] == "bridge":
                 res += "".join(
                     [f" {key} {value}" for key, value in info.get("info_data", {}).items()]
@@ -799,20 +677,20 @@ class _IpAddress(_IfconfigBase):
 
         ips = []
         for addr in data.get("addr_info", []):
-            if addr["family"] == "inet" and addr["prefixlen"] < 32:
+            if addr["family"] == "inet" and int(addr["prefixlen"]) < 32:
                 local = Prefix(f'{addr["local"]}/{addr["prefixlen"]}')
                 secondary = any(local in ip for ip in ips)
                 ips.append(local)
             else:
                 secondary = False
-            res += utils.dict_format(addr, "    {} {}", "family", "local")
-            res += utils.dict_format(addr, " peer {}", "peer")
-            res += utils.dict_format(addr, "/{}", "prefixlen")
-            res += utils.dict_format(addr, " brd {}", "broadcast")
-            res += utils.dict_format(addr, " scope {}", "scope")
+            res += dict_format(addr, "    {} {}", "family", "local")
+            res += dict_format(addr, " peer {}", "peer")
+            res += dict_format(addr, "/{}", "prefixlen")
+            res += dict_format(addr, " brd {}", "broadcast")
+            res += dict_format(addr, " scope {}", "scope")
             if secondary:
                 res += " secondary"
-            res += utils.dict_format(addr, " {}", "label")
+            res += dict_format(addr, " {}", "label")
             if "valid_life_time" in addr and "preferred_life_time" in addr:
                 res += "\n" "       valid_lft " + (
                     "forever"
@@ -831,19 +709,19 @@ class _IpAddress(_IfconfigBase):
 class _Bridge(_IfconfigBase):
     __slots__ = ("_ifconfig",)
 
-    _OPTIONAL_FIELDS = [
-        "hairpin",
-        "guard",
-        "root_block",
-        "fastleave",
-        "learning",
-        "flood",
-        "mcast_flood",
-        "mcast_to_unicast",
-        "neigh_suppress",
-        "vlan_tunnel",
-        "isolated",
-    ]
+    _OPTIONAL_FIELDS = {
+        "hairpin": None,
+        "guard": None,
+        "root_block": None,
+        "fastleave": None,
+        "learning": None,
+        "flood": None,
+        "mcast_flood": None,
+        "mcast_to_unicast": None,
+        "neigh_suppress": None,
+        "vlan_tunnel": None,
+        "isolated": None,
+    }
 
     def __init__(self, text):
         self._ifconfig = _Ifconfig(text)
@@ -887,71 +765,27 @@ class _Bridge(_IfconfigBase):
 
     def str(self, details=None):
         data = self.data(details=details)
-        res = utils.dict_format(data, "{}: {}", "ifindex", "ifname")
-        res += utils.dict_format(data, "@{}", "link")
+        res = dict_format(data, "{}: {}", "ifindex", "ifname")
+        res += dict_format(data, "@{}", "link")
         res += f": <{','.join(self['flags'])}> mtu {self['mtu']}"
-        res += utils.dict_format(data, " master {}", "master")
-        res += utils.dict_format(data, " state {}", "state")
-        res += utils.dict_format(data, " priority {}", "priority")
-        res += utils.dict_format(data, " cost {}", "cost")
+        res += dict_format(data, " master {}", "master")
+        res += dict_format(data, " state {}", "state")
+        res += dict_format(data, " priority {}", "priority")
+        res += dict_format(data, " cost {}", "cost")
         return res
 
 
-class Ifconfig:
-    __slots__ = "_interfaces"
+class Ifconfig(_Items):
     _kind = _Ifconfig
 
     def __init__(self):
-        self._interfaces = []
         res = utils.shell(_IFCONFIG, *_IFCONFIG_OPTS, "-a")
         for text in re.findall(r"(^\w+:.*$\n(?:^\t.*$\n*)*)", res, flags=re.MULTILINE):
             # for every single interface:
-            self._interfaces.append(self._kind(text=text))
-
-    def __iter__(self):
-        for interface in self._interfaces:
-            yield interface
-
-    def __str__(self):
-        return "\n".join(map(str, self._interfaces))
-
-    def __len__(self):
-        return len(self._interfaces)
-
-    def __getitem__(self, index):
-        return self._interfaces[index]
-
-    def pop(self, index=-1):
-        return self._interfaces.pop(index)
-
-    def set(self, interfaces):
-        if not isinstance(interfaces, list) or not all(
-            isinstance(i, _IfconfigBase) for i in interfaces
-        ):
-            raise ValueError(f"argument is not list() of '{_IfconfigBase}'>")
-        self._interfaces = interfaces
+            self.append(self._kind(text=text))
 
     def exist(self, interface):
-        return any(i.name == interface for i in self._interfaces)
-
-    def lookup(self, key, value):
-        """
-        Lookup for element in list with list[ley] == value
-        """
-        return next((i for i in self._interfaces if i.present(key, value)), None)
-
-    def dict(self, details=None):
-        return [interface.dict(details=details) for interface in self._interfaces]
-
-    # alias self.list() as self.dict()
-    list = dict
-
-    def str(self, details=None):
-        return "\n".join([interface.str(details=details) for interface in self._interfaces])
-
-    @property
-    def interfaces(self):
-        return self._interfaces
+        return any(item.name == interface for item in self._data)
 
 
 class IpAddress(Ifconfig):
@@ -965,16 +799,16 @@ class IpAddress(Ifconfig):
         """
         Look up for bond/bridge interface relations
         """
-        for interface in self._interfaces:
-            for index, member in enumerate(interface._ifconfig.get("bond", [])):
+        for item in self._data:
+            for index, member in enumerate(item._ifconfig.get("bond", [])):
                 if member is None:
                     continue
-                self.lookup("ifname", member).link = interface
-            if interface._ifconfig.get("bridge"):
-                for member in interface._ifconfig["bridge"].get("member", []):
-                    self.lookup("ifname", member["interface"]).link = interface
-        for interface in self._interfaces:
-            interface.__update__()
+                self.lookup("ifname", member).link = item
+            if item._ifconfig.get("bridge"):
+                for member in item._ifconfig["bridge"].get("member", []):
+                    self.lookup("ifname", member["interface"]).link = item
+        for item in self._data:
+            item.__update__()
 
 
 class Bridge(Ifconfig):
@@ -988,11 +822,11 @@ class Bridge(Ifconfig):
         """
         Look up for bridge interface relations
         """
-        for interface in self._interfaces:
-            if interface._ifconfig.get("bridge"):
-                interface.link = interface
-                for member in interface._ifconfig["bridge"].get("member", []):
-                    self.lookup("ifname", member["interface"]).link = interface
-        self._interfaces = [interface for interface in self._interfaces if interface.link]
-        for interface in self._interfaces:
-            interface.__update__()
+        for item in self._data:
+            if item._ifconfig.get("bridge"):
+                item.link = item
+                for member in item._ifconfig["bridge"].get("member", []):
+                    self.lookup("ifname", member["interface"]).link = item
+        self._data = [item for item in self._data if item.link]
+        for item in self._data:
+            item.__update__()

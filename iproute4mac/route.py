@@ -4,6 +4,7 @@ import iproute4mac.ifconfig as ifconfig
 import iproute4mac.socket as socket
 import iproute4mac.utils as utils
 
+from iproute4mac.data import _Item, _Items
 from iproute4mac.ifconfig import IPV4ADDR, IPV6ADDR, LLADDR, IFNAME
 from iproute4mac.prefix import Prefix
 
@@ -94,8 +95,8 @@ def is_rtn(name):
     return True
 
 
-class _Route:
-    __slots = "_route"
+class _Route(_Item):
+    _OPTIONAL_FIELDS = {"expire": None, "type": "unicast", "scope": "global"}
 
     def __init__(self, dst, prefix, gateway, flags, dev, expire, src):
         # address type
@@ -133,7 +134,7 @@ class _Route:
         else:
             protocol = "kernel"
 
-        self._route = {
+        self._data = {
             "type": addr_type,
             "dst": dst,
             "gateway": gateway,
@@ -145,63 +146,18 @@ class _Route:
             "flags": [],
         }
 
-    def __contains__(self, other):
-        return other in self._route
-
-    def __str__(self):
-        return self.str()
-
-    def __getitem__(self, key):
-        return self._route.get(key)
-
-    def __setitem__(self, key, value):
-        self._route[key] = value
-
-    def __delitem__(self, key):
-        if key in self._route:
-            del self._route[key]
-
-    def get(self, key, value=None):
-        return self._route.get(key, value)
-
-    def present(self, key, value=None):
-        return utils.find_item(self._route, key, value=value)
-
-    def pop(self, key, value=None):
-        if value is None:
-            return self._route.pop(key)
-        return self._route.pop(key, value)
-
     def source_from(self, prefix):
-        if self._route.get("prefsrc") in prefix:
+        if self._data.get("prefsrc") in prefix:
             return True
         if prefix.is_default and self.get("dst") in prefix:
             return True
         return False
 
-    def dict(self, details=True):
-        """
-        JSON iproute2 output represented by a dictionary
-        """
-        res = {}
-        for key, value in self._route.items():
-            if value is None:
-                continue
-            if not details:
-                if key in _NETSTAT_DETAIL_FIELDS:
-                    continue
-                if key == "type" and value == "unicast":
-                    continue
-                if key == "scope" and value == "global":
-                    continue
-            res.update({key: value})
-        return res
-
     def str(self, details=True):
         """
         Standard iproute2 output
         """
-        route = self.dict(details=details)
+        route = self.data(details=details)
         res = ""
         if "type" in route:
             res += route["type"] + " "
@@ -219,9 +175,7 @@ class _Route:
         return res
 
 
-class Routes:
-    __slots__ = "_routes"
-
+class Routes(_Items):
     _route = re.compile(
         rf"^(?P<dst>(?:default|{IPV4ADDR}|{IPV6ADDR}))(?:%\w+)?(?:/(?P<prefix>\d+))?"
         rf"\s+(?P<gateway>{IPV4ADDR}|{IPV6ADDR}|{LLADDR}|{IFNAME}|link#\d+)(?:%\w+)?"
@@ -234,8 +188,7 @@ class Routes:
     def __init__(self):
         res = utils.shell(_NETSTAT, "-n", "-r")
         links = ifconfig.IpAddress()
-        inet = [a["local"] for i in links for a in i["addr_info"]]
-        self._routes = []
+        inet = [address["local"] for item in links for address in item["addr_info"]]
         for route in self._route.finditer(res):
             dst, prefix, gateway, flags, dev, expire = route.groups()
             if _RTF_WASCLONED in flags:
@@ -252,41 +205,7 @@ class Routes:
                 src = next((a for a in inet if a in dst), None)
             else:
                 src = None
-            self._routes.append(_Route(dst, prefix, gateway, flags, dev, expire, src))
-
-    def __iter__(self):
-        for entry in self._routes:
-            yield entry
-
-    def __str__(self):
-        return "\n".join(map(str, self._routes))
-
-    def __len__(self):
-        return len(self._routes)
-
-    def __getitem__(self, index):
-        return self._routes[index]
-
-    def pop(self, index=-1):
-        return self._routes.pop(index)
-
-    def set(self, routes):
-        if not isinstance(routes, list) or not all(isinstance(r, _Route) for r in routes):
-            raise ValueError("argument is not list() of <class 'netstat._Route'>")
-        self._routes = routes
-
-    def dict(self, details=True):
-        """
-        List route dictiornaries
-        """
-        return [
-            r.dict(details=details)
-            for r in self._routes
-            if details or not re.match(LLADDR, str(r["gateway"]))
-        ]
-
-    def str(self, details=True):
-        return "\n".join([entry.str(details=details) for entry in self._routes])
+            self.append(_Route(dst, prefix, gateway, flags, dev, expire, src))
 
 
 class _RouteGet:

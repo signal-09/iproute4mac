@@ -141,12 +141,12 @@ def add(dev, args):
     vlan_id = args.pop("id")
     vlan_link = args.pop("link")
     if res := ifconfig.run(dev, "create"):
-        utils.stdout(res, optional=True)
+        utils.stdout(res, end="\n", optional=True)
         dev = res.rstrip()
 
     try:
         if res := ifconfig.run(dev, "vlan", vlan_id, "vlandev", vlan_link, fatal=False):
-            utils.stdout(res, optional=True)
+            utils.stdout(res, end="\n", optional=True)
         assert isinstance(res, str)
     except AssertionError:
         ifconfig.run(dev, "destroy")

@@ -706,9 +706,7 @@ class _IpAddress(_IfconfigBase):
         return res.rstrip()
 
 
-class _Bridge(_IfconfigBase):
-    __slots__ = ("_ifconfig",)
-
+class _Bridge(_IpAddress):
     _OPTIONAL_FIELDS = {
         "hairpin": None,
         "guard": None,
@@ -728,7 +726,7 @@ class _Bridge(_IfconfigBase):
         self._name = self._ifconfig._name
         self._data = {
             "ifindex": self._ifconfig["index"],
-            "link": self._ifconfig.link,
+            "link": self._get_link(),
             "ifname": self._name,
             "flags": self._ifconfig["flags"],
             "mtu": self._ifconfig["mtu"],

@@ -135,7 +135,7 @@ def parse(argv, args):
 
 def add(dev, args):
     if res := ifconfig.run(dev, "create"):
-        utils.stdout(res, optional=True)
+        utils.stdout(res, end="\n", optional=True)
 
 
 def set(dev, args):
@@ -144,7 +144,7 @@ def set(dev, args):
         if strcmp(opt, "mode"):
             res += ifconfig.run(dev, "bondmode", value)
     if res:
-        utils.stdout(res, optional=True)
+        utils.stdout(res, end="\n", optional=True)
 
 
 def delete(link, args):

@@ -144,7 +144,7 @@ def iplink_del(dev, link_type, args, links):
     if link_type:
         link_type.delete(link, args)
     elif res := ifconfig.run(dev, "destroy"):
-        utils.stdout(res, optional=True)
+        utils.stdout(res, end="\n", optional=True)
 
 
 def iplink_set(dev, link_type, args, links):
@@ -178,7 +178,7 @@ def iplink_set(dev, link_type, args, links):
                 link_type.free(link, master)
 
     if res:
-        utils.stdout(res, optional=True)
+        utils.stdout(res, end="\n", optional=True)
 
     if link_type:
         link_type.set(dev, args)

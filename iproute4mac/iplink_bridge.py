@@ -134,7 +134,7 @@ def parse(argv, args):
 
 def add(dev, args):
     if res := ifconfig.run(dev, "create"):
-        utils.stdout(res, optional=True)
+        utils.stdout(res, end="\n", optional=True)
 
 
 def set(dev, args):

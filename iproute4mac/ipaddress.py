@@ -85,7 +85,7 @@ def ipaddr_add(dev, local, broadcast):
         args += ("broadcast", broadcast)
 
     if res := ifconfig.run(dev, proto, address, args, "alias"):
-        utils.stdout(res, optional=True)
+        utils.stdout(res, end="\n", optional=True)
 
 
 def ipaddr_del(dev, local):
@@ -97,7 +97,7 @@ def ipaddr_del(dev, local):
         proto = None
 
     if res := ifconfig.run(dev, proto, address, "-alias"):
-        utils.stdout(res, optional=True)
+        utils.stdout(res, end="\n", optional=True)
 
 
 def ipaddr_modify(cmd, argv):

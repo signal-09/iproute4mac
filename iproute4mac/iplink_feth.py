@@ -29,14 +29,14 @@ def parse(argv, args):
 def add(dev, args):
     peer = args.pop("peer", None)
     if res := ifconfig.run(dev, "create"):
-        utils.stdout(res, optional=True)
+        utils.stdout(res, end="\n", optional=True)
         dev = res.rstrip()
 
     try:
         if peer and (res := ifconfig.run(peer, "create", fatal=False)):
             peer = None
             assert isinstance(res, str)
-            utils.stdout(res, optional=True)
+            utils.stdout(res, end="\n", optional=True)
             peer = res.rstrip()
         if peer and (res := ifconfig.run(dev, "peer", peer, fatal=False)):
             assert isinstance(res, str)

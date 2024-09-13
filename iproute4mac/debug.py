@@ -17,7 +17,7 @@ Usage: ip debug { address | neigh | route }""")
 
 
 def debug_address(argv=[]):
-    utils.stdout('Testing "ifconfig":... ')
+    utils.stdout('Testing "address":... ')
 
     old_options = utils.options_override({"show_details": True, "json": True, "pretty": True})
     interfaces = ifconfig.Ifconfig()

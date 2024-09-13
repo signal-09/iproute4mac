@@ -223,8 +223,9 @@ class _Ifconfig(_IfconfigBase):
     _ether = re.compile(r"\tether (?P<ether>\S+)")
     _bridge = re.compile(r"\tConfiguration:\n(?:\t\t.*\n)+(?:\tmember: .*\n(?:\t\s+.*\n)+)*")
     _peer = re.compile(r"\s+peer: (?P<peer>\w+)")
+    _tunnel = re.compile(r"\s+tunnel inet (?P<src>\S+) --> (?P<dst>\S+)")
     _address = re.compile(
-        r"\t(?P<family>inet|inet6) (?P<address>[^/^%]+)(?:%(?P<net>\w+))?"
+        r"\t(?P<family>inet|inet6) (?P<address>[^/^%^ ]+)(?:%(?P<net>\w+))?"
         r"(?: --> (?P<peer>[^/^%]+)(?:%\S+)?)?"
         r"(?:/(?P<prefixlen>\d+))?"
         r"(?: broadcast (?P<broadcast>\S+))?"
@@ -252,7 +253,7 @@ class _Ifconfig(_IfconfigBase):
         r"\tstate availability: (?P<availability>\d+) \((?P<desc>\w+)\)"
     )
     _scheduler = re.compile(r"\tscheduler: (?P<type>\w+)(?: (?P<desc>.*))?")
-    _effective_interface = re.compile(r"\teffective interface: (?P<interface>\w+)")
+    _effective_interface = re.compile(r"\teffective interface: (?P<effective_interface>\w+)")
     _link_rate = re.compile(r"\tlink rate: (?P<rate>[\d\.]+) (?P<rate_um>\w+)")
     _uplink_rate = re.compile(
         r"\tuplink rate: (?P<eff>[\d\.]+) (?P<eff_um>\w+) \[eff\] / (?P<max>[\d\.]+) (?P<max_um>\w+)"
@@ -282,6 +283,7 @@ class _Ifconfig(_IfconfigBase):
             "broadcast": None,
             "bridge": _reBridge(self._bridge, text).data,
             **_reDict(self._peer, text).data,
+            "tunnel": _reDict(self._tunnel, text).data,
             "address": _reList(self._address, text).data,
             "vlan": _reDict(self._vlan, text).data,
             **_reDict(self._netif, text).data,
@@ -298,7 +300,7 @@ class _Ifconfig(_IfconfigBase):
             "link_quality": _reDict(self._link_quality, text).data,
             "state_availability": _reDict(self._state_availability, text).data,
             "scheduler": _reDict(self._scheduler, text).data,
-            "effective_interface": _reDict(self._effective_interface, text).data,
+            **_reDict(self._effective_interface, text).data,
             "link_rate": _reDict(self._link_rate, text).data,
             "uplink_rate": _reDict(self._uplink_rate, text).data,
             "downlink_rate": _reDict(self._downlink_rate, text).data,
@@ -317,7 +319,9 @@ class _Ifconfig(_IfconfigBase):
             self._data["link_type"] = "loopback"
             self._data["ether"] = "00:00:00:00:00:00"
             self._data["broadcast"] = "00:00:00:00:00:00"
-        elif "POINTOPOINT" in self._data["flags"]:
+        elif "POINTOPOINT" in self._data["flags"] and self._data.get("tunnel"):
+            self._data["link_type"] = "ipip"
+        else:
             self._data["link_type"] = "none"
 
     def str(self, details=True):
@@ -345,6 +349,8 @@ class _Ifconfig(_IfconfigBase):
             # res += "\tAddress cache:\n"
         if self.name.startswith("feth"):
             res += dict_format(data, "\tpeer: {}\n", "peer", default="<none>")
+        if data.get("tunnel"):
+            res += f"\ttunnel inet {data['tunnel']['src']} --> {data['tunnel']['dst']}\n"
         for addr in data.get("address", []):
             res += f"\t{addr['family']} {addr['address']}"
             res += dict_format(addr, "%{}", "net")
@@ -452,7 +458,7 @@ class _IpAddress(_IfconfigBase):
             "operstate": OPER_STATES[self._ifconfig.get("status", "none")],
             "group": "default",
             "txqlen": _TXQLEN,
-            "link_type": self._ifconfig.get("link_type", "none"),
+            "link_type": self._ifconfig.get("link_type"),
             "address": self._ifconfig.get("ether"),
             "link_pointtopoint": True if "POINTOPOINT" in self._ifconfig["flags"] else None,
             "broadcast": self._ifconfig.get("broadcast"),
@@ -468,6 +474,9 @@ class _IpAddress(_IfconfigBase):
             # "gso_max_segs": 65535,
             "addr_info": self._get_addr_info(),
         }
+        if self._ifconfig.get("tunnel"):
+            self._data["address"] = self._ifconfig["tunnel"]["src"]
+            self._data["broadcast"] = self._ifconfig["tunnel"]["dst"]
 
     def __update__(self):
         self._data.update(
@@ -488,7 +497,7 @@ class _IpAddress(_IfconfigBase):
         return self.link.name if self.link else None
 
     def _get_info_kind(self):
-        if utils.startwith(self._ifconfig["interface"], "bridge", "bond", "feth", "vlan"):
+        if utils.startwith(self._ifconfig["interface"], "bridge", "bond", "feth", "gif", "vlan"):
             return re.sub("[0-9]+", "", self._ifconfig["interface"])
         return None
 
@@ -655,7 +664,9 @@ class _IpAddress(_IfconfigBase):
 
         res += dict_format(data, "    link/{}", "link_type")
         res += dict_format(data, " {}", "address")
-        res += dict_format(data, " brd {}", "broadcast")
+        res += dict_format(
+            data, " peer {}" if self._data["link_pointtopoint"] else " brd {}", "broadcast"
+        )
         res += dict_format(data, " minmtu {}", "min_mtu")
         res += dict_format(data, " maxmtu {}", "max_mtu")
         res += dict_format(data, " numtxqueues {}", "num_tx_queues")
@@ -684,7 +695,7 @@ class _IpAddress(_IfconfigBase):
             else:
                 secondary = False
             res += dict_format(addr, "    {} {}", "family", "local")
-            res += dict_format(addr, " peer {}", "peer")
+            res += dict_format(addr, " peer {}", "address")
             res += dict_format(addr, "/{}", "prefixlen")
             res += dict_format(addr, " brd {}", "broadcast")
             res += dict_format(addr, " scope {}", "scope")
@@ -828,3 +839,46 @@ class Bridge(Ifconfig):
         self._data = [item for item in self._data if item.link]
         for item in self._data:
             item.__update__()
+
+
+class _BridgeForward(_Item):
+    __slots__ = ("_bridge", "_expire")
+    _entry = re.compile(
+        rf"(?P<lladdr>{LLADDR}) Vlan(?P<vlan>\d+) (?P<dev>\w+) (?P<expire>\d+) flags=(?P<flag>\w+)<(?P<flags>.*)>"
+    )
+    _OPTIONAL_FIELDS = {"expire": None}
+
+    def __init__(self, bridge, text):
+        res = _reDict(self._entry, text).data
+        self._bridge = bridge
+        self._expire = int(res["expire"])
+        self._data = {
+            "mac": res["lladdr"],
+            "ifname": res["dev"],
+            "vlan": int(res["vlan"]),
+            "flags": res["flags"],
+            "master": None,
+            "state": "permanent" if self._expire == 0 else "",
+        }
+
+    @property
+    def bridge(self):
+        return self._bridge
+
+    def str(self, details=True):
+        data = self.data(details=details)
+        res = data["mac"]
+        res += dict_format(data, " dev {}", "ifname")
+        res += dict_format(data, " vlan {}", "vlan")
+        res += dict_format(data, " {}", "state")
+        return res
+
+
+class FDB(_Items):
+    def __init__(self):
+        res = utils.shell(_IFCONFIG, "-l").split()
+        for interface in res:
+            if interface.startswith("bridge"):
+                text = utils.shell(_IFCONFIG, interface, "addr")
+                for entry in text.splitlines():
+                    self.append(_BridgeForward(interface, entry))

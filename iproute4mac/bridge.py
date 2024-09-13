@@ -5,6 +5,7 @@ import os
 import sys
 
 import iproute4mac.brlink as brlink
+import iproute4mac.brfdb as brfdb
 import iproute4mac.libc as libc
 import iproute4mac.socket as socket
 import iproute4mac.utils as utils
@@ -34,7 +35,7 @@ where  OBJECT := { link | fdb | mdb | vlan | vni | monitor }
 # Implemented objects
 OBJS = [
     ("link", brlink.do_brlink),
-    ("fdb", utils.do_notimplemented),
+    ("fdb", brfdb.do_brfdb),
     ("mdb", utils.do_notimplemented),
     ("vlan", utils.do_notimplemented),
     ("vni", utils.do_notimplemented),

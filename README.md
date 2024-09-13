@@ -62,7 +62,7 @@ Examples:
 * `ip neigh flush`
 
 * `bridge link [ list | show ]`
-* `bridge fdb `
+* `bridge fdb [ list | show ]`
 
 ## Installation
 

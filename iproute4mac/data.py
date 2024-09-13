@@ -3,6 +3,10 @@ def isnumber(value):
 
 
 def empty(value):
+    """
+    Empty values are: None, "", (), [], {}
+    Note: 0 is not evaluated as empty
+    """
     return value is None or (not isnumber(value) and not value)
 
 
@@ -61,17 +65,19 @@ def dict_format(data, string, *fields, default=None):
     return string.format(*[data.get(field, default) for field in fields])
 
 
-def delete_keys(data, *args):
-    for entry in data:
-        for arg in args:
-            entry.pop(arg, None)
+def delete_keys(data, *keys, recurse=False):
+    for item in data:
+        for key in keys:
+            item.pop(key, None)
+        else:
+            if recurse and isinstance(data[key], dict):
+                delete_keys(data[key], *keys, True)
 
 
 def list_filter(data):
     """
-    Recursively remove empty values
+    Return the list without empty values
     """
-
     res = []
     for value in data:
         if isinstance(value, dict):
@@ -85,9 +91,8 @@ def list_filter(data):
 
 def dict_filter(data):
     """
-    Recursively remove empty values
+    Return the dictionary without empty values
     """
-
     res = {}
     for key, value in data.items():
         if isinstance(value, dict):
@@ -99,9 +104,17 @@ def dict_filter(data):
     return res
 
 
+def filter_empty(data):
+    if isinstance(data, list):
+        return list_filter(data)
+    if isinstance(data, dict):
+        return dict_filter(data)
+    raise ValueError
+
+
 class _Item:
     """
-    Dictionary of data
+    Iterable dictionary of data
     """
 
     __slots__ = ("_data",)
@@ -141,15 +154,14 @@ class _Item:
 
     def data(self, details=True):
         """
-        Raw data, without empty values and, eventually, optional fields
+        Raw data, without empty values and, eventually, without optional fields
         """
         res = {}
         for key, value in self._data.items():
             if value is None:
                 continue
             if not details and key in self._OPTIONAL_FIELDS:
-                skip = self._OPTIONAL_FIELDS[key]
-                if skip is None or skip == value:
+                if self._OPTIONAL_FIELDS[key] is None or self._OPTIONAL_FIELDS[key] == value:
                     continue
             res[key] = value
         return res
@@ -174,6 +186,7 @@ class _Item:
             return self._list(value)
         if isinstance(value, str):
             return self._cast(value)
+        # numbers|class|...
         return value
 
     def _list(self, data):
@@ -205,7 +218,7 @@ class _Item:
 
 class _Items:
     """
-    List of _Item
+    Iterable list of dictionaries
     """
 
     __slots__ = ("_data",)
@@ -243,6 +256,9 @@ class _Items:
             raise ValueError("data is not list() of {_Item}")
         self._data = data
 
+    def lookup(self, key, value):
+        return next((item for item in self._data if item.present(key, value)), None)
+
     def dict(self, details=None):
         return [item.dict(details=details) for item in self._data]
 
@@ -251,6 +267,3 @@ class _Items:
 
     def str(self, details=None):
         return "\n".join([item.str(details=details) for item in self._data])
-
-    def lookup(self, key, value):
-        return next((item for item in self._data if item.present(key, value)), None)

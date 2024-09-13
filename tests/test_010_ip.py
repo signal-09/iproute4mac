@@ -16,6 +16,14 @@ def test_version(script_runner):
         assert res.stdout == f"{_CMD} wrapper, iproute4mac-{iproute4mac.VERSION}\n"
 
 
+def test_debug(script_runner):
+    for opt in ["address"]:
+        res = script_runner.run([_CMD, "debug", opt])
+        assert res.returncode == libc.EXIT_SUCCESS
+        assert res.stderr == ""
+        assert res.stdout == f'Testing "{opt}":... OK\n'
+
+
 def test_help(script_runner):
     for opt in ["help", "--help", "-help", "-h"]:
         res = script_runner.run([_CMD, opt])

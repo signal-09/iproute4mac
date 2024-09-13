@@ -5,6 +5,8 @@ from subprocess import check_output
 
 
 _BRIDGE = None
+_FETH = None
+_LLADDR = "f0:e1:d2:c3:b4:a5"
 
 
 def shell(cmd):
@@ -14,19 +16,23 @@ def shell(cmd):
 def setup_module(module):
     """setup any state specific to the execution of the given module"""
     globals()["_BRIDGE"] = shell("ifconfig bridge create")
+    globals()["_FETH"] = shell("ifconfig feth create")
+    shell(f"ifconfig {_BRIDGE} addm {_FETH}")
+    shell(f"ifconfig {_BRIDGE} static {_FETH} {_LLADDR}")
 
 
 def teardown_module(module):
     """teardown any state that was previously setup with a setup_module method"""
+    if _FETH:
+        shell(f"ifconfig {_FETH} destroy")
     if _BRIDGE:
         shell(f"ifconfig {_BRIDGE} destroy")
 
 
-def test_bridge_link_show(script_runner):
+def test_bridge_fdb_show(script_runner):
     checks = (
         # command, res.returncode, res.stdout, res.stderr
-        ("ip -d link show", 0, f": {_BRIDGE}:", r"^$"),
-        (f"ip -d link show dev {_BRIDGE}", 0, f": {_BRIDGE}:", r"^$"),
+        ("bridge fdb show", 0, f"{_LLADDR} dev {_FETH}", r"^$"),
     )
     for cmd, ret, out, err in checks:
         res = script_runner.run(cmd.split())

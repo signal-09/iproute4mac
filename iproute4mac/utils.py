@@ -286,6 +286,8 @@ def shell(*args, fatal=True):
 
 
 def get_prefsrc(host):
+    if not isinstance(host, Prefix):
+        raise ValueError(f"host ({type(host)}) must by of {Prefix}")
     sock = socket.socket(host.family, socket.SOCK_DGRAM)
     sock.connect((repr(host), 7))
     src = sock.getsockname()[0]

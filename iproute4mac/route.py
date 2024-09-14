@@ -122,6 +122,9 @@ class _Route(_Item):
             scope = "host"
         else:
             scope = "global"
+
+        # gateway
+        if gateway and re.match(f"{IPV4ADDR}|{IPV6ADDR}", gateway):
             gateway = Prefix(gateway)
             if dst.family == socket._AF_UNSPEC:
                 dst.family = gateway.family

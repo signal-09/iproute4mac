@@ -10,7 +10,7 @@ import iproute4mac.libc as libc
 import iproute4mac.socket as socket
 import iproute4mac.utils as utils
 
-from iproute4mac import OPTION
+from iproute4mac import __version__, OPTION
 from iproute4mac.utils import matches, strcmp, matches_color
 
 
@@ -75,7 +75,7 @@ def main():
         if matches(opt, "-help"):
             usage()
         elif matches(opt, "-Version"):
-            print(f"bridge wrapper, iproute4mac-{iproute4mac.VERSION}")
+            print(f"bridge wrapper, iproute4mac-{__version__}")
             exit(libc.EXIT_SUCCESS)
         elif matches(opt, "-stats".startswith(opt) or "-statistics"):
             OPTION["show_stats"] = True

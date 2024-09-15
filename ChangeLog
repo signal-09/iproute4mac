@@ -1,0 +1,122 @@
+CHANGES
+=======
+
+* Switching to pbr
+
+0.5.2
+-----
+
+* Prevent empty Item/Items to raise exceptions
+* Fixed \`ip route\` host entry
+
+0.5.1
+-----
+
+* Release 0.5.1
+
+0.5.0
+-----
+
+* Release 0.5.0 including minor fixes
+* Introducing data library
+* Introduced \`bridge link show\` command
+* Fix bridge/bond/member linking
+* Fix extended flags representation
+* Fix last interface pattern last line lost
+* Simplified Ifconfig and IpAddress objects
+* Start prerelease 0.5.0
+* Added feature summary in README.md
+
+0.4.3
+-----
+
+* Fix \`ip route show via ...\` with LLADDR in routes
+
+0.4.2
+-----
+
+* Improved testing and CI automation
+
+0.4.1
+-----
+
+* Fix valid\_lft/preferred\_lft type cast
+
+0.4.0
+-----
+
+* Moved to object NUD, Route and Ifconfig
+
+0.3.2
+-----
+
+* Introducing tests for vlan, feth, bridge, and bond
+* Extended \`ip address\` and \`ip neigh\`
+
+0.3.0
+-----
+
+* Implemented \`ip neigh show\` and \`flush\`
+
+0.2.1
+-----
+
+* Added blackhole support for ip route add/del
+
+0.2.0
+-----
+
+* Added iplink\_modify
+* Initial implementation of iplink\_modify
+* Moved global options to utils.py
+* Aligned README.md
+* Aligned README.md
+
+0.1.7
+-----
+
+* Added \`ip route add|del|change|replace\`
+
+0.1.6
+-----
+
+* Added \`ip route get\`
+* Migrate from Flake8 to Ruff
+
+0.1.5
+-----
+
+* Introducing ipaddress Library
+* Moved to format string to improve readability
+* Added "Contributing" chapter to README.md
+* Python function restyle for strcmp() and matches()
+* Fix syntax in README.md
+
+0.1.4
+-----
+
+* Release version 0.1.4
+* Release version 0.1.3
+* Improved compatibility with iproute2 args
+* Fix 'Device "dev" does not exist.'
+* Sort list of addresses in ip addr (inet6 last)
+* Added valid and preferred lifetime for inet6
+* Fixed compatibility with Python <=3.9
+* Initial implementation of \`ip route list\`
+
+0.1.2
+-----
+
+* Rewrite ifconfig parser
+
+0.1.1
+-----
+
+* Linted code and added github actions
+
+0.1.0
+-----
+
+* Added README.md
+* Initial implementation
+* Initial commit

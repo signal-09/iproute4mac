@@ -160,7 +160,7 @@ class _Route(_Item):
         """
         Standard iproute2 output
         """
-        route = self.data(details=details)
+        route = self.dict(details=details)
         res = ""
         if "type" in route:
             res += route["type"] + " "

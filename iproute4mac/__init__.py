@@ -1,4 +1,4 @@
-VERSION = "0.5.2.dev1"
+VERSION = "0.5.2"
 
 # global options
 OPTION = {

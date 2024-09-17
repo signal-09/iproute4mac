@@ -104,6 +104,53 @@ def dict_filter(data):
     return res
 
 
+def _cast(value):
+    if value.isdigit():
+        return int(value)
+    if value.replace(".", "", 1).isdigit():
+        return float(value)
+    if value == "<none>":
+        return None
+    if value.lower() in ["true", "yes", "enabled"]:
+        return True
+    if value.lower() in ["false", "no", "disabled"]:
+        return False
+    return value
+
+
+def _value(key, value):
+    if isinstance(value, dict):
+        return _dict(value)
+    if isinstance(value, list):
+        return _list(value)
+    if isinstance(value, str):
+        return _cast(value)
+    # numbers|class|...
+    return value
+
+
+def _list(data):
+    res = []
+    for value in data:
+        if isinstance(value, dict):
+            value = _dict(value)
+        elif isinstance(value, list):
+            value = _list(value)
+        elif value is not None:
+            value = _cast(value)
+        res.append(value)
+    return res
+
+
+def _dict(data):
+    res = {}
+    for key, value in data.items():
+        value = _value(key, value)
+        if not empty(value):
+            res[key] = value
+    return res
+
+
 def filter_empty(data):
     if isinstance(data, list):
         return list_filter(data)
@@ -129,88 +176,43 @@ class _Item:
         return self.str()
 
     def __contains__(self, item):
-        return item in self._data
+        return item in self.data
 
     def __getitem__(self, key):
-        return self._data.get(key)
+        return self.data.get(key)
 
     def __setitem__(self, key, value):
-        self._data[key] = value
+        self.data[key] = value
 
     def __delitem__(self, key):
-        if key in self._data:
-            del self._data[key]
+        if key in self.data:
+            del self.data[key]
 
     def get(self, key, default=None, recurse=False):
-        return get_item(self._data, key, default) if recurse else self._data.get(key, default)
+        return get_item(self.data, key, default) if recurse else self.data.get(key, default)
 
     def pop(self, key, default=None):
         if default is None:
-            return self._data.pop(key)
-        return self._data.pop(key, default)
+            return self.data.pop(key)
+        return self.data.pop(key, default)
 
     def present(self, key, value=None, recurse=False, strict=False):
-        return find_item(self._data, key, value=value, recurse=recurse, strict=strict)
+        return find_item(self.data, key, value=value, recurse=recurse, strict=strict)
 
-    def data(self, details=True):
-        """
-        Raw data, without empty values and, eventually, without optional fields
-        """
-        res = {}
-        for key, value in self._data.items():
-            if value is None:
-                continue
-            if not details and key in self._OPTIONAL_FIELDS:
-                if self._OPTIONAL_FIELDS[key] is None or self._OPTIONAL_FIELDS[key] == value:
-                    continue
-            res[key] = value
-        return res
-
-    def _cast(self, value):
-        if value.isdigit():
-            return int(value)
-        if value.replace(".", "", 1).isdigit():
-            return float(value)
-        if value == "<none>":
-            return None
-        if value.lower() in ["true", "yes", "enabled"]:
-            return True
-        if value.lower() in ["false", "no", "disabled"]:
-            return False
-        return value
-
-    def _value(self, key, value):
-        if isinstance(value, dict):
-            return self._dict(value)
-        if isinstance(value, list):
-            return self._list(value)
-        if isinstance(value, str):
-            return self._cast(value)
-        # numbers|class|...
-        return value
-
-    def _list(self, data):
-        res = []
-        for value in data:
-            if isinstance(value, dict):
-                value = self._dict(value)
-            elif isinstance(value, list):
-                value = self._list(value)
-            elif value is not None:
-                value = self._cast(value)
-            res.append(value)
-        return res
-
-    def _dict(self, data):
-        res = {}
-        for key, value in data.items():
-            value = self._value(key, value)
-            if not empty(value):
-                res[key] = value
-        return res
+    @property
+    def data(self):
+        return self._data if hasattr(self, "_data") else {}
 
     def dict(self, details=True):
-        return self._dict(self.data(details=details))
+        return _dict(
+            {
+                key: value
+                for key, value in self.data.items()
+                if details
+                or key not in self._OPTIONAL_FIELDS
+                or (self._OPTIONAL_FIELDS[key] is not None and self._OPTIONAL_FIELDS[key] != value)
+            }
+        )
 
     def str(self, details=True):
         raise NotImplementedError
@@ -227,20 +229,20 @@ class _Items:
         raise NotImplementedError
 
     def __iter__(self):
-        for item in self._data:
+        for item in self.data:
             yield item
 
     def __str__(self):
         return "\n".join(map(str, self._data))
 
     def __len__(self):
-        return len(self._data)
+        return len(self.data)
 
     def __getitem__(self, index):
-        return self._data[index]
+        return self.data[index]
 
     def pop(self, index=-1):
-        return self._data.pop(index)
+        return self.data.pop(index)
 
     def append(self, item):
         if not isinstance(item, _Item):
@@ -257,13 +259,17 @@ class _Items:
         self._data = data
 
     def lookup(self, key, value):
-        return next((item for item in self._data if item.present(key, value)), None)
+        return next((item for item in self.data if item.present(key, value)), None)
+
+    @property
+    def data(self):
+        return self._data if hasattr(self, "_data") else []
 
     def dict(self, details=None):
-        return [item.dict(details=details) for item in self._data]
+        return [item.dict(details=details) for item in self.data]
 
     # alias self.list() as self.dict()
     list = dict
 
     def str(self, details=None):
-        return "\n".join([item.str(details=details) for item in self._data])
+        return "\n".join([item.str(details=details) for item in self.data])

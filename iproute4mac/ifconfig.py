@@ -325,7 +325,7 @@ class _Ifconfig(_IfconfigBase):
             self._data["link_type"] = "none"
 
     def str(self, details=True):
-        data = self.data(details=details)
+        data = self.data
         res = f"{self._name}: flags={data['flag']}<{','.join(data['flags'])}>"
         res += dict_format(data, " mtu {}", "mtu")
         res += dict_format(data, " rtref {}", "rtref")
@@ -652,8 +652,8 @@ class _IpAddress(_IfconfigBase):
             addr_info.append(addr)
         return addr_info
 
-    def str(self, details=None):
-        data = self.data(details=details)
+    def str(self, details=True):
+        data = self.dict(details=details)
         res = dict_format(data, "{}: {}", "ifindex", "ifname")
         res += dict_format(data, "@{}", "link")
         res += f": <{','.join(self['flags'])}> mtu {self['mtu']}"
@@ -772,8 +772,8 @@ class _Bridge(_IpAddress):
                 }
             )
 
-    def str(self, details=None):
-        data = self.data(details=details)
+    def str(self, details=True):
+        data = self.dict(details=details)
         res = dict_format(data, "{}: {}", "ifindex", "ifname")
         res += dict_format(data, "@{}", "link")
         res += f": <{','.join(self['flags'])}> mtu {self['mtu']}"
@@ -866,7 +866,7 @@ class _BridgeForward(_Item):
         return self._bridge
 
     def str(self, details=True):
-        data = self.data(details=details)
+        data = self.dict(details=details)
         res = data["mac"]
         res += dict_format(data, " dev {}", "ifname")
         res += dict_format(data, " vlan {}", "vlan")

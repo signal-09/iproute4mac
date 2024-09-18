@@ -1,6 +1,11 @@
 CHANGES
 =======
 
+0.5.3
+-----
+
+* Introducing PBR for versioning
+
 0.5.2
 -----
 

@@ -1,4 +1,8 @@
-VERSION = "0.5.2"
+from pbr.version import VersionInfo
+
+
+version_info = VersionInfo("iproute4mac")
+__version__ = version_info.release_string()
 
 # global options
 OPTION = {

@@ -1,7 +1,7 @@
 import iproute4mac
 import iproute4mac.libc as libc
 
-from iproute4mac.ip import OBJS
+from iproute4mac.cmd.ip import OBJS
 from iproute4mac.utils import do_notimplemented
 
 
@@ -13,7 +13,7 @@ def test_version(script_runner):
         res = script_runner.run([_CMD, opt])
         assert res.returncode == libc.EXIT_SUCCESS
         assert res.stderr == ""
-        assert res.stdout == f"{_CMD} wrapper, iproute4mac-{iproute4mac.VERSION}\n"
+        assert res.stdout == f"{_CMD} wrapper, iproute4mac-{iproute4mac.__version__}\n"
 
 
 def test_debug(script_runner):

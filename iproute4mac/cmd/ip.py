@@ -13,7 +13,7 @@ import iproute4mac.libc as libc
 import iproute4mac.socket as socket
 import iproute4mac.utils as utils
 
-from iproute4mac import OPTION
+from iproute4mac import __version__, OPTION
 from iproute4mac.utils import matches, strcmp, matches_color
 
 
@@ -157,7 +157,7 @@ def main():
             OPTION["timestamp"] = True
             OPTION["timestamp_short"] = True
         elif matches(opt, "-Version"):
-            print(f"ip wrapper, iproute4mac-{iproute4mac.VERSION}")
+            print(f"ip wrapper, iproute4mac-{__version__}")
             exit(libc.EXIT_SUCCESS)
         elif matches(opt, "-force"):
             OPTION["force"] = True

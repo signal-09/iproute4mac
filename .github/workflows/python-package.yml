@@ -21,7 +21,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install pytest pytest-console-scripts
-        python -m pip install -r requirements.txt
+        python -m pip install -r requirements.txt .
     - name: Test with pytest
       run: |
         sudo python -m pytest -v
@@ -36,11 +36,40 @@ jobs:
         path: dist/
 
 
+  test-pypi-publish:
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    needs:
+    - build
+
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/p/iproute4mac
+
+    permissions:
+      id-token: write
+
+    steps:
+    - name: Retrieve release distributions
+      uses: actions/download-artifact@v4
+      with:
+        name: release-dists
+        path: dist/
+
+    - name: Publish distribution to TestPyPI
+      uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        user: __token__
+        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+        repository-url: https://test.pypi.org/legacy/
+
+
   pypi-publish:
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     needs:
     - build
+    - test-pypi-publish
 
     permissions:
       id-token: write
@@ -97,34 +126,6 @@ jobs:
         GITHUB_TOKEN: ${{ github.token }}
       run: |
         gh release upload '${{ github.ref_name }}' dist/** --repo '${{ github.repository }}'
-
-
-  test-pypi-publish:
-    runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
-    needs:
-    - build
-
-    environment:
-      name: testpypi
-      url: https://test.pypi.org/p/iproute4mac
-
-    permissions:
-      id-token: write
-
-    steps:
-    - name: Retrieve release distributions
-      uses: actions/download-artifact@v4
-      with:
-        name: release-dists
-        path: dist/
-
-    - name: Publish distribution to TestPyPI
-      uses: pypa/gh-action-pypi-publish@release/v1
-      with:
-        user: __token__
-        password: ${{ secrets.TEST_PYPI_API_TOKEN }}
-        repository-url: https://test.pypi.org/legacy/
 
 
   update-homebrew-releases:

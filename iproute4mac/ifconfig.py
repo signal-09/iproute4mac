@@ -139,7 +139,8 @@ class _reBridge(_reBase):
     _member = re.compile(
         r"\tmember: (?P<interface>\w+) flags=(?P<flag>\w+)<(?P<flags>.*)>\n"
         r"\t\s+ifmaxaddr (?P<ifmaxaddr>\d+) port (?P<port>\d+) priority (?P<priority>\d+) path cost (?P<cost>\d+)\n"
-        r"\t\s+hostfilter (?P<hostfilter>\d+) hw: (?P<hw>\S+) ip: (?P<ip>\S+)"
+        r"\t\s+hostfilter (?P<hostfilter>\d+) hw: (?P<hw>\S+) ip: (?P<ip>\S+)\n"
+        r"(?:\t\s+checksum stats:\n(?P<checksum_stats>(?:.*\n)+))?"
     )
 
     def __init__(self, pattern, text):
@@ -262,6 +263,7 @@ class _Ifconfig(_IfconfigBase):
         r"\tdownlink rate: (?P<eff>[\d\.]+) (?P<eff_um>\w+) \[eff\] / (?P<max>[\d\.]+) (?P<max_um>\w+)"
     )
     _timestamp = re.compile(r"\ttimestamp: (?P<timestamp>\w+)")
+    _desc = re.compile(r"\tdesc: (?P<desc>\S+)")
     _qosmarking = re.compile(r"\tqosmarking enabled: (?P<enabled>\w+) mode: (?P<mode>\w+)")
     _low_power_mode = re.compile(r"\tlow power mode: (?P<low_power_mode>\w+)")
     _mpklog = re.compile(r"\tmulti layer packet logging \(mpklog\): (?P<mpklog>\w+)")
@@ -305,6 +307,7 @@ class _Ifconfig(_IfconfigBase):
             "uplink_rate": _reDict(self._uplink_rate, text).data,
             "downlink_rate": _reDict(self._downlink_rate, text).data,
             **_reDict(self._timestamp, text).data,
+            **_reDict(self._desc, text).data,
             "qosmarking": _reDict(self._qosmarking, text).data,
             **_reDict(self._low_power_mode, text).data,
             **_reDict(self._mpklog, text).data,
@@ -335,18 +338,6 @@ class _Ifconfig(_IfconfigBase):
                 res += f"\t{flags}={data[flags]['flag']}<{','.join(data[flags]['flags'])}>\n"
         if self._data["link_type"] != "loopback":
             res += dict_format(data, "\tether {}\n", "ether")
-        if data.get("bridge"):
-            bridge = data["bridge"]
-            res += "\tConfiguration:\n"
-            res += f"\t\tid {bridge['id']} priority {bridge['priority']} hellotime {bridge['hellotime']} fwddelay {bridge['fwddelay']}\n"
-            res += f"\t\tmaxage {bridge['maxage']} holdcnt {bridge['holdcnt']} proto {bridge['proto']} maxaddr {bridge['maxaddr']} timeout {bridge['timeout']}\n"
-            res += f"\t\troot id {bridge['root_id']} priority {bridge['root_priority']} ifcost {bridge['root_cost']} port {bridge['root_port']}\n"
-            res += f"\t\tipfilter {bridge['ipfilter']} flags {bridge['flag']}\n"
-            for member in bridge.get("member", []):
-                res += f"\tmember: {member['interface']} flags={member['flag']}<{','.join(member['flags'])}>\n"
-                res += f"\t        ifmaxaddr {member['ifmaxaddr']} port {member['port']} priority {member['priority']} path cost {member['cost']}\n"
-                res += f"\t        hostfilter {member['hostfilter']} hw: {member['hw']} ip: {member['ip']}\n"
-            # res += "\tAddress cache:\n"
         if self.name.startswith("feth"):
             res += dict_format(data, "\tpeer: {}\n", "peer", default="<none>")
         if data.get("tunnel"):
@@ -363,6 +354,19 @@ class _Ifconfig(_IfconfigBase):
             res += dict_format(addr, " vltime {}", "vltime")
             res += dict_format(addr, " scopeid {}", "scopeid")
             res += "\n" if addr["family"] == "inet" else " \n"
+        if data.get("bridge"):
+            bridge = data["bridge"]
+            res += "\tConfiguration:\n"
+            res += f"\t\tid {bridge['id']} priority {bridge['priority']} hellotime {bridge['hellotime']} fwddelay {bridge['fwddelay']}\n"
+            res += f"\t\tmaxage {bridge['maxage']} holdcnt {bridge['holdcnt']} proto {bridge['proto']} maxaddr {bridge['maxaddr']} timeout {bridge['timeout']}\n"
+            res += f"\t\troot id {bridge['root_id']} priority {bridge['root_priority']} ifcost {bridge['root_cost']} port {bridge['root_port']}\n"
+            res += f"\t\tipfilter {bridge['ipfilter']} flags {bridge['flag']}\n"
+            for member in bridge.get("member", []):
+                res += f"\tmember: {member['interface']} flags={member['flag']}<{','.join(member['flags'])}>\n"
+                res += f"\t        ifmaxaddr {member['ifmaxaddr']} port {member['port']} priority {member['priority']} path cost {member['cost']}\n"
+                res += f"\t        hostfilter {member['hostfilter']} hw: {member['hw']} ip: {member['ip']}\n"
+                res += dict_format(member, "\t\tchecksum stats:\n{}", "checksum_stats")
+            # res += "\tAddress cache:\n"
         res += dict_format(
             data.get("vlan"), "\tvlan: {} parent interface: {}\n", "vlanid", "parent"
         )
@@ -423,6 +427,7 @@ class _Ifconfig(_IfconfigBase):
             "max_um",
         )
         res += dict_format(data, "\ttimestamp: {}\n", "timestamp")
+        res += dict_format(data, "\tdesc: {}\n", "desc")
         res += dict_format(
             data.get("qosmarking"),
             "\tqosmarking enabled: {} mode: {}\n",

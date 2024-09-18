@@ -1,4 +1,3 @@
-from iproute4mac import VERSION
 from setuptools import setup
 
-setup(version=VERSION)
+setup(setup_requires=["pbr>=2.0.0"], pbr=True)

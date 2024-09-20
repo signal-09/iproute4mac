@@ -25,13 +25,16 @@ def debug_address(argv=[]):
     ip_ifconfig = str(interfaces)
     os_ifconfig = ifconfig.run()
 
+    ip_ifconfig_lines = [line.rstrip() for line in ip_ifconfig.splitlines()]
+    os_ifconfig_lines = [line.rstrip() for line in os_ifconfig.splitlines()]
+
     if diff := list(
         unified_diff(
-            ip_ifconfig.splitlines(),
-            os_ifconfig.splitlines(),
-            fromfile="iproute4mac",
-            tofile="ifconfig",
-            n=50,
+            ip_ifconfig_lines,
+            os_ifconfig_lines,
+            fromfile="ip address show",
+            tofile=f"ifconfig {' '.join(ifconfig._IFCONFIG_OPTS)}",
+            n=3 if OPTION["verbose"] <= 3 else 50,
         )
     ):
         utils.stdout(end="\n")
@@ -39,19 +42,22 @@ def debug_address(argv=[]):
     else:
         utils.stdout("OK", end="\n")
 
+    return libc.EXIT_ERROR if len(diff) > 0 else libc.EXIT_SUCCESS
+
 
 def debug_neigh(argv=[]):
-    pass
+    return libc.EXIT_SUCCESS
 
 
 def debug_route(argv=[]):
-    pass
+    return libc.EXIT_SUCCESS
 
 
 def all():
-    debug_address()
-    debug_neigh()
-    debug_route()
+    err = debug_address()
+    err += debug_neigh()
+    err += debug_route()
+    return libc.EXIT_ERROR if err else libc.EXIT_SUCCESS
 
 
 def do_debug(argv):

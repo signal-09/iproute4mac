@@ -8,7 +8,7 @@ from iproute4mac.prefix import Prefix
 
 
 _IFCONFIG = "ifconfig"
-_IFCONFIG_OPTS = ["-f", "inet:cidr,inet6:cidr", "-L", "-m", "-v"]
+_IFCONFIG_OPTS = ["-L", "-m", "-v"]
 
 _SYSCTL_RXQLEN = "net.link.generic.system.rcvq_maxlen"
 _SYSCTL_TXQLEN = "net.link.generic.system.sndq_maxlen"
@@ -227,8 +227,9 @@ class _Ifconfig(_IfconfigBase):
     _tunnel = re.compile(r"\s+tunnel inet (?P<src>\S+) --> (?P<dst>\S+)")
     _address = re.compile(
         r"\t(?P<family>inet|inet6) (?P<address>[^/^%^ ]+)(?:%(?P<net>\w+))?"
-        r"(?: --> (?P<peer>[^/^%]+)(?:%\S+)?)?"
-        r"(?:/(?P<prefixlen>\d+))?"
+        r"(?: --> (?P<peer>[^/^%^ ]+)(?:%\w+)?)?"
+        r"(?: prefixlen (?P<prefixlen>\d+))?"
+        r"(?: netmask 0x(?P<netmask>[0-9a-fA-F]{8}))?"
         r"(?: broadcast (?P<broadcast>\S+))?"
         r"(?: (?P<autoconf>autoconf))?"
         r"(?: (?P<secured>secured))?"
@@ -264,6 +265,7 @@ class _Ifconfig(_IfconfigBase):
     )
     _timestamp = re.compile(r"\ttimestamp: (?P<timestamp>\w+)")
     _desc = re.compile(r"\tdesc: (?P<desc>\S+)")
+    _unaligned_pkts = re.compile(r"\tunaligned pkts: (?P<unaligned_pkts>\d+)")
     _qosmarking = re.compile(r"\tqosmarking enabled: (?P<enabled>\w+) mode: (?P<mode>\w+)")
     _low_power_mode = re.compile(r"\tlow power mode: (?P<low_power_mode>\w+)")
     _mpklog = re.compile(r"\tmulti layer packet logging \(mpklog\): (?P<mpklog>\w+)")
@@ -308,6 +310,7 @@ class _Ifconfig(_IfconfigBase):
             "downlink_rate": _reDict(self._downlink_rate, text).data,
             **_reDict(self._timestamp, text).data,
             **_reDict(self._desc, text).data,
+            **_reDict(self._unaligned_pkts, text).data,
             "qosmarking": _reDict(self._qosmarking, text).data,
             **_reDict(self._low_power_mode, text).data,
             **_reDict(self._mpklog, text).data,
@@ -346,7 +349,10 @@ class _Ifconfig(_IfconfigBase):
             res += f"\t{addr['family']} {addr['address']}"
             res += dict_format(addr, "%{}", "net")
             res += dict_format(addr, " --> {}", "peer")
-            res += dict_format(addr, "/{}", "prefixlen")
+            if addr.get("netmask"):
+                res += dict_format(addr, " netmask 0x{}", "netmask")
+            else:
+                res += dict_format(addr, " prefixlen {}", "prefixlen")
             res += dict_format(addr, " broadcast {}", "broadcast")
             res += dict_format(addr, " {}", "autoconf")
             res += dict_format(addr, " {}", "secured")
@@ -428,6 +434,7 @@ class _Ifconfig(_IfconfigBase):
         )
         res += dict_format(data, "\ttimestamp: {}\n", "timestamp")
         res += dict_format(data, "\tdesc: {}\n", "desc")
+        res += dict_format(data, "\tunaligned pkts: {}\n", "unaligned_pkts")
         res += dict_format(
             data.get("qosmarking"),
             "\tqosmarking enabled: {} mode: {}\n",
@@ -631,7 +638,7 @@ class _IpAddress(_IfconfigBase):
                 addr["address"] = inet["peer"]
             if find_item(inet, "prefixlen"):
                 addr["prefixlen"] = inet["prefixlen"]
-            if find_item(inet, "netmask"):
+            elif find_item(inet, "netmask"):
                 addr["prefixlen"] = netmask_to_length(inet["netmask"])
             if find_item(inet, "broadcast"):
                 addr["broadcast"] = inet["broadcast"]
@@ -793,7 +800,7 @@ class Ifconfig(_Items):
     _kind = _Ifconfig
 
     def __init__(self):
-        res = utils.shell(_IFCONFIG, *_IFCONFIG_OPTS, "-a")
+        res = utils.shell(_IFCONFIG, *_IFCONFIG_OPTS)
         for text in re.findall(r"(^\w+:.*$\n(?:^\t.*$\n*)*)", res, flags=re.MULTILINE):
             # for every single interface:
             self.append(self._kind(text=text))

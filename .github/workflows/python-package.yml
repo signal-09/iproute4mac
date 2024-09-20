@@ -13,6 +13,9 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
+      with:
+        # pulls all commits and tags (needed by pbr)
+        fetch-depth: "0"
     - name: Set up Python
       uses: actions/setup-python@v5
       with:

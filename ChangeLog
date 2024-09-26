@@ -1,6 +1,14 @@
 CHANGES
 =======
 
+0.5.6
+-----
+
+* Added manual pages for \`ip\` and \`bridge\` command
+
+0.5.5
+-----
+
 * Preserve compatibility with macOS Monterey
 
 0.5.4
@@ -17,6 +25,10 @@ CHANGES
 -----
 
 * Prevent empty Item/Items to raise exceptions
+
+0.5.2.dev1
+----------
+
 * Fixed \`ip route\` host entry
 
 0.5.1

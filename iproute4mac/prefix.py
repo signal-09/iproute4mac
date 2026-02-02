@@ -37,7 +37,7 @@ class Prefix:
                 self._address = prefix
                 return
             if isinstance(prefix, ipaddress._BaseNetwork):
-                if pack and prefix.prefixlen == prefix._max_prefixlen:
+                if pack and prefix.prefixlen == prefix.max_prefixlen:
                     self._address = prefix.network_address
                 else:
                     self._network = prefix
@@ -82,7 +82,7 @@ class Prefix:
             except ValueError:
                 self._address = ipaddress.ip_address(prefix)
                 self._network = ipaddress.ip_network(f"{prefix}/{prefixlen}", strict=False)
-            if pack and self._network.prefixlen == self._network._max_prefixlen:
+            if pack and self._network.prefixlen == self._network.max_prefixlen:
                 self._address = self._network.network_address
                 self._network = None
         else:
@@ -240,7 +240,7 @@ class Prefix:
         if self._is_prefix:
             return str(self._address) + "/" + str(self._network.prefixlen)
         if self._address:
-            return str(self._address) + "/" + str(self._address._max_prefixlen)
+            return str(self._address) + "/" + str(self._address.max_prefixlen)
         return str(self._network)
 
     @property
@@ -250,7 +250,7 @@ class Prefix:
         if self._network:
             return self._network.prefixlen
         if self._address:
-            return self._address._max_prefixlen
+            return self._address.max_prefixlen
         raise ValueError("unknown prefix length")
 
     @property
@@ -258,9 +258,9 @@ class Prefix:
         if self._is_default:
             return 0
         if self._address:
-            return self._address._max_prefixlen
+            return self._address.max_prefixlen
         if self._network:
-            return self._network._max_prefixlen
+            return self._network.max_prefixlen
         raise ValueError("unknown prefix length")
 
     @property

@@ -250,7 +250,7 @@ class _Ifconfig(_IfconfigBase):
     _agent = re.compile(
         r'\tagent domain:(?P<domain>[\w\.]+) type:(?P<type>\w+) flags:(?P<flag>0x[0-9a-fA-F]+) desc:"(?P<desc>.*)"'
     )
-    _link_quality = re.compile(r"\tlink quality: (?P<quality>\d+) \((?P<desc>\w+)\)")
+    _link_quality = re.compile(r"\tlink quality: (?P<quality>-?\d+) \((?P<desc>\w+)\)")
     _state_availability = re.compile(
         r"\tstate availability: (?P<availability>\d+) \((?P<desc>\w+)\)"
     )

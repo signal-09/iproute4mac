@@ -1,6 +1,16 @@
 CHANGES
 =======
 
+0.6.0
+-----
+
+* Movig to Python 3.14 and fix "link quality" error
+
+0.5.7
+-----
+
+* Fixed \`man ip-address\`
+
 0.5.6
 -----
 
@@ -25,10 +35,6 @@ CHANGES
 -----
 
 * Prevent empty Item/Items to raise exceptions
-
-0.5.2.dev1
-----------
-
 * Fixed \`ip route\` host entry
 
 0.5.1
